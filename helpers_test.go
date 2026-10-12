@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"testing/fstest"
 
 	"go.dokimi.dev/assert"
@@ -14,12 +15,16 @@ import (
 	"go.stealthscale.io/cli"
 )
 
-// The app and the command that the specs run.
+// The app and the commands that the specs run.
 const (
-	appName     = "srv"
-	appHelp     = "Serve the store."
-	command     = "serve"
-	commandHelp = "Run the server."
+	appName        = "srv"
+	appHelp        = "Serve the store."
+	command        = "serve"
+	commandHelp    = "Run the server."
+	parent         = "db"
+	parentHelp     = "Manage the database."
+	subcommand     = "migrate"
+	subcommandHelp = "Migrate the database to the current schema."
 )
 
 // errWrite is the error of a writer that fails every write.
@@ -38,6 +43,34 @@ type failingWriter struct{}
 // Write returns errWrite.
 func (failingWriter) Write([]byte) (int, error) {
 	return 0, errWrite
+}
+
+// recorder is a Renderer that records what the package passes to it, and returns err. It writes
+// nothing.
+type recorder struct {
+	err     error
+	help    *cli.Help
+	failure *cli.Failure
+	environ []string
+	rows    []cli.DebugRow
+}
+
+// Help records h and environ.
+func (r *recorder) Help(_ io.Writer, environ []string, h *cli.Help) error {
+	r.help, r.environ = h, environ
+	return r.err
+}
+
+// Error records f and environ.
+func (r *recorder) Error(_ io.Writer, environ []string, f *cli.Failure) error {
+	r.failure, r.environ = f, environ
+	return r.err
+}
+
+// Debug records rows and environ.
+func (r *recorder) Debug(_ io.Writer, environ []string, rows []cli.DebugRow) error {
+	r.rows, r.environ = rows, environ
+	return r.err
 }
 
 // execute runs app with the arguments args, the environment variables vars and the files files, in
@@ -62,4 +95,22 @@ func serving[G, C any](tb assert.TB) (*cli.App[G], *cli.Run[G, C]) {
 		return nil
 	})
 	return app, got
+}
+
+// nesting returns the app srv with the global options G, the command db with the options P, and the
+// subcommand migrate of db with the options C. The handlers of db and migrate store their runs in
+// the runs that nesting returns, so a test reads the options that the last run of each received.
+func nesting[G, P, C any](tb assert.TB) (*cli.App[G], *cli.Run[G, P], *cli.Run[G, C]) {
+	tb.Helper()
+	db, migrate := new(cli.Run[G, P]), new(cli.Run[G, C])
+	app := cli.New[G](appName, appHelp)
+	cmd := app.Command(parent, parentHelp, func(_ context.Context, run *cli.Run[G, P]) error {
+		*db = *run
+		return nil
+	})
+	cmd.Command(subcommand, subcommandHelp, func(_ context.Context, run *cli.Run[G, C]) error {
+		*migrate = *run
+		return nil
+	})
+	return app, db, migrate
 }

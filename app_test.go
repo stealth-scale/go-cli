@@ -40,6 +40,9 @@ type (
 		Tags   []string
 		Port   int `                      short:"p"`
 	}
+	filesGlobal struct {
+		Files []string `arg:""`
+	}
 )
 
 // executeBody runs the app of fuzzApp with a command line of tokens that the app declares and of
@@ -148,14 +151,189 @@ func TestApp(t *testing.T) {
 			assert.Equal(t, res.err, errHandler, "Execute returns the error of the handler", assert.ByIdentity())
 		})
 
-		t.Run("returns ErrDeclaration for a nil handler", func(t *testing.T) {
+		t.Run("returns the command that it adds", func(t *testing.T) {
+			t.Parallel()
+			ran := false
+			app := cli.New[appGlobal](appName, appHelp)
+			cmd := app.Command[struct{}](parent, parentHelp, nil)
+			cmd.Command(subcommand, subcommandHelp, func(context.Context, *cli.Run[appGlobal, struct{}]) error {
+				ran = true
+				return nil
+			})
+			res := execute(t, app, []string{parent, subcommand}, nil, nil)
+			assert.NoError(t, res.err, "Execute runs the subcommand")
+			assert.True(t, ran, "the subcommand of the returned command runs")
+		})
+
+		t.Run("returns ErrDeclaration for a nil handler of a command without subcommands", func(t *testing.T) {
 			t.Parallel()
 			app := cli.New[appGlobal](appName, appHelp)
 			app.Command[appOptions](command, commandHelp, nil)
 			res := execute(t, app, []string{command}, nil, nil)
 			assert.ErrorIs(t, res.err, cli.ErrDeclaration, "Execute returns ErrDeclaration")
-			assert.Equal(t, res.err.Error(), "cli: invalid declaration: the command serve has no handler",
-				"the error names the command")
+			assert.Equal(t, res.err.Error(),
+				"cli: invalid declaration: the command serve has no handler and no subcommands",
+				"the error states the command")
+		})
+	})
+
+	t.Run("Handle", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("runs the handler of the app for a command line without a command", func(t *testing.T) {
+			t.Parallel()
+			var got *cli.Run[appGlobal, appGlobal]
+			app := cli.New[appGlobal](appName, appHelp)
+			app.Handle(func(_ context.Context, run *cli.Run[appGlobal, appGlobal]) error {
+				got = run
+				return nil
+			})
+			res := execute(t, app, []string{"-v"}, nil, nil)
+			assert.NoError(t, res.err, "Execute runs the handler of the app")
+			assert.True(t, got.Global().Verbose, "the handler receives the global options")
+		})
+
+		t.Run("passes the global options as the options of the run", func(t *testing.T) {
+			t.Parallel()
+			var got *cli.Run[appGlobal, appGlobal]
+			app := cli.New[appGlobal](appName, appHelp)
+			app.Handle(func(_ context.Context, run *cli.Run[appGlobal, appGlobal]) error {
+				got = run
+				return nil
+			})
+			res := execute(t, app, nil, nil, nil)
+			assert.NoError(t, res.err, "Execute runs the handler of the app")
+			assert.Equal(t, got.Config(), got.Global(), "Config returns the global options", assert.ByIdentity())
+		})
+
+		t.Run("reads the positional arguments of the global options of an app without commands", func(t *testing.T) {
+			t.Parallel()
+			var got []string
+			app := cli.New[filesGlobal](appName, appHelp)
+			app.Handle(func(_ context.Context, run *cli.Run[filesGlobal, filesGlobal]) error {
+				got = run.Global().Files
+				return nil
+			})
+			res := execute(t, app, []string{"a.txt", "b.txt"}, nil, nil)
+			assert.NoError(t, res.err, "Execute runs the handler of the app")
+			assert.Equal(t, got, []string{"a.txt", "b.txt"}, "the handler receives the positional arguments")
+		})
+
+		t.Run("runs a command of an app with a handler", func(t *testing.T) {
+			t.Parallel()
+			ranApp := false
+			app, got := serving[appGlobal, appOptions](t)
+			app.Handle(func(context.Context, *cli.Run[appGlobal, appGlobal]) error {
+				ranApp = true
+				return nil
+			})
+			res := execute(t, app, []string{command, "-p", "8"}, nil, nil)
+			assert.NoError(t, res.err, "Execute runs the command")
+			assert.Equal(t, got.Config().Port, 8, "the command receives its options")
+			assert.False(t, ranApp, "the handler of the app does not run")
+		})
+
+		t.Run("returns ErrUnknownCommand for an unknown command of an app with a handler", func(t *testing.T) {
+			t.Parallel()
+			app, _ := serving[appGlobal, appOptions](t)
+			app.Handle(func(context.Context, *cli.Run[appGlobal, appGlobal]) error { return nil })
+			res := execute(t, app, []string{"serv"}, nil, nil)
+			assert.ErrorIs(t, res.err, cli.ErrUnknownCommand, "Execute returns ErrUnknownCommand")
+		})
+
+		t.Run("replaces the handler of an earlier call", func(t *testing.T) {
+			t.Parallel()
+			var ran []string
+			app := cli.New[appGlobal](appName, appHelp)
+			for _, name := range []string{"first", "second"} {
+				app.Handle(func(context.Context, *cli.Run[appGlobal, appGlobal]) error {
+					ran = append(ran, name)
+					return nil
+				})
+			}
+			res := execute(t, app, nil, nil, nil)
+			assert.NoError(t, res.err, "Execute runs the handler of the app")
+			assert.Equal(t, ran, []string{"second"}, "the handler of the later call runs alone")
+		})
+
+		t.Run("returns ErrDeclaration for a nil handler", func(t *testing.T) {
+			t.Parallel()
+			app, _ := serving[appGlobal, appOptions](t)
+			app.Handle(nil)
+			res := execute(t, app, []string{command}, nil, nil)
+			assert.ErrorIs(t, res.err, cli.ErrDeclaration, "Execute returns ErrDeclaration")
+			assert.Equal(t, res.err.Error(), "cli: invalid declaration: the app srv has a nil handler",
+				"the error states the app")
+		})
+	})
+
+	t.Run("Use", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("calls the hooks of the app around the handler of a command", func(t *testing.T) {
+			t.Parallel()
+			var events []string
+			app := cli.New[appGlobal](appName, appHelp)
+			app.Command(command, commandHelp, func(context.Context, *cli.Run[appGlobal, appOptions]) error {
+				events = append(events, "handler")
+				return nil
+			})
+			app.Use(
+				func(ctx context.Context, _ *cli.Run[appGlobal, appGlobal], next func(context.Context) error) error {
+					events = append(events, "start")
+					err := next(ctx)
+					events = append(events, "end")
+					return err
+				},
+			)
+			res := execute(t, app, []string{command}, nil, nil)
+			assert.NoError(t, res.err, "Execute runs the command")
+			assert.Equal(t, events, []string{"start", "handler", "end"}, "the hook runs around the handler")
+		})
+
+		t.Run("passes the global options to a hook as the options of its command", func(t *testing.T) {
+			t.Parallel()
+			var got *cli.Run[appGlobal, appGlobal]
+			app, _ := serving[appGlobal, appOptions](t)
+			app.Use(
+				func(ctx context.Context, run *cli.Run[appGlobal, appGlobal], next func(context.Context) error) error {
+					got = run
+					return next(ctx)
+				},
+			)
+			res := execute(t, app, []string{command, "-v"}, nil, nil)
+			assert.NoError(t, res.err, "Execute runs the command")
+			assert.True(t, got.Config().Verbose, "the hook reads the global options")
+			assert.Equal(t, got.Config(), got.Global(), "Config returns the global options", assert.ByIdentity())
+		})
+
+		t.Run("calls the hooks of the app around the handler of the app", func(t *testing.T) {
+			t.Parallel()
+			var events []string
+			app := cli.New[appGlobal](appName, appHelp)
+			app.Handle(func(context.Context, *cli.Run[appGlobal, appGlobal]) error {
+				events = append(events, "handler")
+				return nil
+			})
+			app.Use(
+				func(ctx context.Context, _ *cli.Run[appGlobal, appGlobal], next func(context.Context) error) error {
+					events = append(events, "hook")
+					return next(ctx)
+				},
+			)
+			res := execute(t, app, nil, nil, nil)
+			assert.NoError(t, res.err, "Execute runs the handler of the app")
+			assert.Equal(t, events, []string{"hook", "handler"}, "the hook runs before the handler")
+		})
+
+		t.Run("returns ErrDeclaration for a nil hook", func(t *testing.T) {
+			t.Parallel()
+			app, _ := serving[appGlobal, appOptions](t)
+			app.Use(nil)
+			res := execute(t, app, []string{command}, nil, nil)
+			assert.ErrorIs(t, res.err, cli.ErrDeclaration, "Execute returns ErrDeclaration")
+			assert.Equal(t, res.err.Error(), "cli: invalid declaration: the app srv has a nil hook",
+				"the error states the app")
 		})
 	})
 
@@ -172,12 +350,7 @@ func TestApp(t *testing.T) {
 			app, _ := serving[appGlobal, appOptions](t)
 			res := execute(t, app, []string{"-h"}, nil, nil)
 			assert.NoError(t, res.err, "Execute returns nil")
-			assert.HasPrefix(
-				t,
-				res.stdout,
-				"Usage: srv [global options] <command> [options]\n",
-				"Stdout receives the help",
-			)
+			assert.HasPrefix(t, res.stdout, "Usage: srv <command> [options]\n", "Stdout receives the help")
 			assert.Empty(t, res.stderr, "Stderr receives nothing")
 		})
 
@@ -198,13 +371,36 @@ func TestApp(t *testing.T) {
 			t.Parallel()
 			app, _ := serving[appGlobal, appOptions](t)
 			res := execute(t, app, []string{"-v"}, nil, nil)
-			assert.HasPrefix(
-				t,
-				res.stderr,
-				"Usage: srv [global options] <command> [options]\n",
-				"Stderr receives the help",
-			)
+			assert.HasPrefix(t, res.stderr, "Usage: srv <command> [options]\n", "Stderr receives the help")
 			assert.Empty(t, res.stdout, "Stdout receives nothing")
+		})
+
+		t.Run("writes the help of a command without a handler to Stderr for a path that ends at it",
+			func(t *testing.T) {
+				t.Parallel()
+				app := cli.New[appGlobal](appName, appHelp)
+				cache := app.Command[struct{}]("cache", "", nil)
+				cache.Command("purge", "", func(context.Context, *cli.Run[appGlobal, struct{}]) error { return nil })
+				res := execute(t, app, []string{"cache"}, nil, nil)
+				assert.HasPrefix(t, res.stderr, "Usage: srv cache <command> [options]\n",
+					"Stderr receives the help of the command")
+			})
+
+		t.Run("returns ErrMissing with the path of a command without a handler", func(t *testing.T) {
+			t.Parallel()
+			app := cli.New[appGlobal](appName, appHelp)
+			cache := app.Command[struct{}]("cache", "", nil)
+			cache.Command("purge", "", func(context.Context, *cli.Run[appGlobal, struct{}]) error { return nil })
+			res := execute(t, app, []string{"cache"}, nil, nil)
+			assert.ErrorIs(t, res.err, cli.ErrMissing, "Execute returns ErrMissing")
+			assert.Equal(t, res.err.Error(), "cli: cache: missing command", "the error states the command")
+		})
+
+		t.Run("writes a blank line after the help of a command line without a command", func(t *testing.T) {
+			t.Parallel()
+			app, _ := serving[appGlobal, appOptions](t)
+			res := execute(t, app, nil, nil, nil)
+			assert.HasSuffix(t, res.stderr, "\n\n", "a blank line follows the help")
 		})
 
 		t.Run("returns ErrMissing for a command line without a command", func(t *testing.T) {
@@ -213,6 +409,16 @@ func TestApp(t *testing.T) {
 			res := execute(t, app, nil, nil, nil)
 			assert.ErrorIs(t, res.err, cli.ErrMissing, "Execute returns ErrMissing")
 			assert.Equal(t, res.err.Error(), "cli: missing command", "the error states the missing command")
+		})
+
+		t.Run("returns the error of Stderr when the blank line after the help fails to write", func(t *testing.T) {
+			t.Parallel()
+			app, _ := serving[appGlobal, appOptions](t)
+			app.Render(&recorder{})
+			var stdout bytes.Buffer
+			err := app.Execute(t.Context(), &cli.Env{Stdout: &stdout, Stderr: failingWriter{}})
+			assert.ErrorIs(t, err, errWrite, "Execute returns the error of the writer")
+			assert.Equal(t, err.Error(), "cli: write the help: disk full", "Execute wraps the error in a message")
 		})
 
 		t.Run("returns the error of Stdout when the help fails to write", func(t *testing.T) {

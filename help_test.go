@@ -41,6 +41,13 @@ type (
 	listOnlyOptions struct {
 		Files []string `help:"Files to copy." arg:""`
 	}
+	bareGlobal struct {
+		Config cli.ConfigFile
+	}
+	countGlobal struct {
+		Files []string `help:"Files to count."  arg:"" default:""`
+		Lines bool     `help:"Count the lines."                   short:"l"`
+	}
 )
 
 // TestHelp checks the help of an app and of its commands.
@@ -50,7 +57,7 @@ func TestHelp(t *testing.T) {
 	t.Run("Execute", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("writes the usage, the commands and the global options of the app", func(t *testing.T) {
+		t.Run("writes the usage, the commands and the options of the app", func(t *testing.T) {
 			t.Parallel()
 			app, _ := serving[helpGlobal, helpOptions](t)
 			app.Command("migrate", "Run the migrations.", func(context.Context, *cli.Run[helpGlobal, struct{}]) error {
@@ -71,10 +78,63 @@ func TestHelp(t *testing.T) {
 
 		t.Run("leaves out the text of an app without help", func(t *testing.T) {
 			t.Parallel()
-			app := cli.New[struct{ Config cli.ConfigFile }](appName, "")
+			app := cli.New[bareGlobal](appName, "")
+			app.Handle(func(context.Context, *cli.Run[bareGlobal, bareGlobal]) error { return nil })
 			res := execute(t, app, []string{"-h"}, nil, nil)
 			assert.NoError(t, res.err, "Execute writes the help")
 			golden.Match(t, "help/bare-app.txt", []byte(res.stdout), golden.ShouldUpdate())
+		})
+
+		t.Run("writes the usage, the arguments and the options of an app with a handler", func(t *testing.T) {
+			t.Parallel()
+			app := cli.New[countGlobal]("wc", "Count the lines of files.")
+			app.Handle(func(context.Context, *cli.Run[countGlobal, countGlobal]) error { return nil })
+			res := execute(t, app, []string{"-h"}, nil, nil)
+			assert.NoError(t, res.err, "Execute writes the help")
+			golden.Match(t, "help/handler.txt", []byte(res.stdout), golden.ShouldUpdate())
+		})
+
+		t.Run("writes the usage, the subcommands and the options of a command with subcommands", func(t *testing.T) {
+			t.Parallel()
+			app := cli.New[helpGlobal](appName, appHelp)
+			db := app.Command[Store](parent, parentHelp, nil)
+			db.Command(subcommand, subcommandHelp, func(context.Context, *cli.Run[helpGlobal, stepsOptions]) error {
+				return nil
+			})
+			db.Command(
+				"seed",
+				"Load the fixtures into the database.",
+				func(context.Context, *cli.Run[helpGlobal, struct{}]) error {
+					return nil
+				},
+			)
+			res := execute(t, app, []string{parent, "-h"}, nil, nil)
+			assert.NoError(t, res.err, "Execute writes the help")
+			golden.Match(t, "help/parent.txt", []byte(res.stdout), golden.ShouldUpdate())
+		})
+
+		t.Run(
+			"writes an optional command in the usage of a command with a handler and subcommands",
+			func(t *testing.T) {
+				t.Parallel()
+				app, _, _ := nesting[helpGlobal, Store, stepsOptions](t)
+				res := execute(t, app, []string{parent, "-h"}, nil, nil)
+				assert.NoError(t, res.err, "Execute writes the help")
+				assert.HasPrefix(
+					t,
+					res.stdout,
+					"Usage: srv db [<command>] [options]\n",
+					"the usage marks the command optional",
+				)
+			},
+		)
+
+		t.Run("writes the options of the ancestors of a subcommand as its global options", func(t *testing.T) {
+			t.Parallel()
+			app, _, _ := nesting[helpGlobal, Store, stepsOptions](t)
+			res := execute(t, app, []string{parent, subcommand, "-h"}, nil, nil)
+			assert.NoError(t, res.err, "Execute writes the help")
+			golden.Match(t, "help/subcommand.txt", []byte(res.stdout), golden.ShouldUpdate())
 		})
 
 		t.Run("names the kind of a value of an unnamed type", func(t *testing.T) {

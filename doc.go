@@ -8,9 +8,9 @@
 // field, converts the text of every source to the type of the field, and applies the sources in
 // one order. A handler receives the options as typed values, with the source of each.
 //
-// [New] returns an [App] for the global options, and [App.Command] adds a command with its handler.
-// The handler receives a [Run], whose [Run.Global] and [Run.Config] return the options after every
-// source is applied:
+// [New] returns an [App] for the global options, and [App.Command] adds a [Command] with its
+// handler. The handler receives a [Run], whose [Run.Global] and [Run.Config] return the options
+// after every source is applied:
 //
 //	type Serve struct {
 //		Addr string `help:"Address to listen on." default:":8080" short:"a"`
@@ -22,15 +22,30 @@
 //	})
 //	os.Exit(app.Main(context.Background(), cli.OS()))
 //
+// # Commands
+//
+// The commands of an app form a tree with the app at its root, so the global options are the
+// options of the app. [Command.Command] adds a subcommand to a command. A command has a handler,
+// subcommands or both, and [App.Handle] sets the handler of the app. The options of a command apply
+// to it and to its descendants. A command reads the options of an ancestor through an embedded
+// pointer to their type. The package sets the pointer to the options of that ancestor.
+//
+// A [Hook] runs before the handler and calls it through the function next, so the code of the hook
+// after next runs after the handler returns. [App.Use] adds a hook that every run calls, and
+// [Command.Use] adds a hook that the runs of a command and of its descendants call. The hooks of the
+// app run first, then the hooks of each command of the path, and the handler runs last.
+//
 // # Names
 //
 // Each exported field of an options struct is an option with three names:
 //   - The flag is the name of the field in kebab case. The field DryRun is --dry-run, and HTTPPort
 //     is --http-port.
-//   - The environment variable joins the app, the command and the flag in upper case, with an
-//     underscore for each dash. A run of the command serve of the app srv reads the field Addr from
-//     SRV_SERVE_ADDR.
-//   - The config key joins the command and the flag with dots, such as serve.addr.
+//   - The environment variable joins the app, the path of the command and the flag in upper case,
+//     with an underscore for each dash. A run of the command serve of the app srv reads the field
+//     Addr from SRV_SERVE_ADDR, and the subcommand migrate of the command db reads the field Steps
+//     from SRV_DB_MIGRATE_STEPS.
+//   - The config key joins the path of the command and the flag with dots, such as serve.addr and
+//     db.migrate.steps.
 //
 // A global option has no command in its variable and its key.
 //
@@ -100,11 +115,15 @@
 //   - A long flag takes its value after an equals sign or in the next argument.
 //   - Short flags combine in one argument, such as -vq. A short flag with a value takes the rest of
 //     its argument or the next one, such as -p8080 or -p 8080.
-//   - A global flag can come before or after the command.
+//   - A flag can come anywhere after the name of the command that declares it, and a global flag
+//     anywhere.
+//   - After a command with subcommands, an argument that is not a flag is the name of a
+//     subcommand.
 //   - The argument -- ends the flags.
 //
-// The flags -h and --help write the help. The help lists the options by name and the positional
-// arguments in the order of their fields.
+// The flags -h and --help write the help of the last command of the path. The help lists the
+// options by name and the positional arguments in the order of their fields. It lists the options
+// of the ancestors of a command as its global options.
 //
 // # Errors
 //
@@ -128,7 +147,9 @@
 // An [Env] contains the arguments, the environment variables, the files and the standard streams
 // of a run, so a test runs a program without the state of its process. [Vars] returns the
 // environment variables of a map, and [Environ] lists the variables of the same map. [NewRun]
-// returns the [Run] of a handler for a test that calls the handler without [App.Execute].
+// returns the [Run] of a handler for a test that calls the handler without [App.Execute]. The
+// package go.stealthscale.io/cli/clitest builds the Env of a test, runs a program with it, and
+// writes the transcript of a list of runs for a golden file.
 //
 // # Concurrency
 //

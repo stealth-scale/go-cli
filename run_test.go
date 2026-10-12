@@ -5,6 +5,7 @@ package cli_test
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"strings"
 	"testing"
@@ -215,6 +216,39 @@ func TestRun(t *testing.T) {
 			assert.NoError(t, err, "NewRun returns a run")
 			_, ok := run.Source(&config.Addr)
 			assert.False(t, ok, "Source reports no source")
+		})
+	})
+
+	t.Run("Command", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("returns the path of the command of the run", func(t *testing.T) {
+			t.Parallel()
+			app, _, migrate := nesting[runGlobal, struct{}, runOptions](t)
+			res := execute(t, app, []string{parent, subcommand}, nil, nil)
+			assert.NoError(t, res.err, "Execute runs the subcommand")
+			assert.Equal(t, migrate.Command(), parent+" "+subcommand, "Command returns the names of the path")
+		})
+
+		t.Run("returns the empty string in a run of the handler of the app", func(t *testing.T) {
+			t.Parallel()
+			got := command
+			app := cli.New[runGlobal](appName, appHelp)
+			app.Handle(func(_ context.Context, run *cli.Run[runGlobal, runGlobal]) error {
+				got = run.Command()
+				return nil
+			})
+			res := execute(t, app, nil, nil, nil)
+			assert.NoError(t, res.err, "Execute runs the handler of the app")
+			assert.Empty(t, got, "Command returns the empty string")
+		})
+
+		t.Run("returns the empty string in a run from NewRun", func(t *testing.T) {
+			t.Parallel()
+			out := &bytes.Buffer{}
+			run, err := cli.NewRun(&runGlobal{}, &runOptions{}, &cli.Env{Stdout: out, Stderr: out})
+			assert.NoError(t, err, "NewRun returns a run")
+			assert.Empty(t, run.Command(), "Command returns the empty string")
 		})
 	})
 }

@@ -5,6 +5,7 @@ package cli_test
 
 import (
 	"context"
+	"net/url"
 	"testing"
 	"testing/fstest"
 
@@ -39,6 +40,26 @@ type (
 		DB  database   `prefix:"db"`
 		TLS tlsOptions `prefix:""`
 	}
+	// Settings contains global options, whose type is exported so that the options of a command
+	// embed a pointer to them.
+	Settings struct {
+		Verbose bool
+	}
+	settingsOptions struct {
+		*Settings
+		Port int
+	}
+	vault struct {
+		Token string
+	}
+	// Session is a type without options that two commands of one path have as their options. Its
+	// type is exported, so the options of a command embed a pointer to it.
+	Session struct{}
+	// Pipe is an exported type without a conversion that is not a struct.
+	Pipe        chan int
+	invalidTLS  struct{ Cert chan int }
+	tlsGroup    struct{ TLS invalidTLS }
+	embeddedURL struct{ *url.URL }
 )
 
 // declared returns the error of a run of the app srv with the global options G and the command serve
@@ -46,6 +67,14 @@ type (
 func declared[G, C any](tb assert.TB) error {
 	tb.Helper()
 	app, _ := serving[G, C](tb)
+	return execute(tb, app, []string{"-h"}, nil, nil).err
+}
+
+// nestedDeclared returns the error of a run of the app srv with the global options G, the command db
+// with the options P and its subcommand migrate with the options C.
+func nestedDeclared[G, P, C any](tb assert.TB) error {
+	tb.Helper()
+	app, _, _ := nesting[G, P, C](tb)
 	return execute(tb, app, []string{"-h"}, nil, nil).err
 }
 
@@ -63,6 +92,21 @@ func TestDeclare(t *testing.T) {
 			assert.ErrorIs(t, err, cli.ErrDeclaration, "Execute returns ErrDeclaration")
 			assert.Equal(t, err.Error(), `cli: invalid declaration: the field cli_test.shortOptions.Port has the `+
 				`short flag "ab", which is not one ASCII letter other than h`, "the error names the type and the field")
+		})
+
+		t.Run("names the group of an invalid option in the path of its field", func(t *testing.T) {
+			t.Parallel()
+			err := declared[struct{}, tlsGroup](t)
+			assert.Equal(t, err.Error(), "cli: invalid declaration: the field cli_test.tlsGroup.TLS.Cert has the type "+
+				"chan int, which has no conversion", "the error names the group and the field")
+		})
+
+		t.Run("declares an option for an embedded pointer to a type with a conversion", func(t *testing.T) {
+			t.Parallel()
+			app, got := serving[struct{}, embeddedURL](t)
+			res := execute(t, app, []string{command, "--url", "https://example.com"}, nil, nil)
+			assert.NoError(t, res.err, "Execute runs the command")
+			assert.Equal(t, got.Config().String(), "https://example.com", "the run sets the embedded pointer")
 		})
 
 		tests := []struct {
@@ -196,11 +240,110 @@ func TestDeclare(t *testing.T) {
 				want: `has the config key "serve..port", which has an empty name`,
 			},
 			{
-				name: "returns ErrDeclaration for a positional argument of the global options",
+				name: "returns ErrDeclaration for a positional argument of the global options of an app with commands",
 				give: declared[struct {
 					Target string `arg:""`
 				}, struct{}],
-				want: "is a positional argument of the global options, which come before the command",
+				want: "the app srv has commands and the positional argument TARGET",
+			},
+			{
+				name: "returns ErrDeclaration for an app without a handler and without commands",
+				give: func(tb assert.TB) error {
+					tb.Helper()
+					return execute(tb, cli.New[struct{}](appName, appHelp), []string{"-h"}, nil, nil).err
+				},
+				want: "the app srv has no handler and no commands",
+			},
+			{
+				name: "returns ErrDeclaration for a subcommand without a handler and without subcommands",
+				give: func(tb assert.TB) error {
+					tb.Helper()
+					app := cli.New[struct{}](appName, appHelp)
+					db := app.Command(parent, parentHelp, func(context.Context, *cli.Run[struct{}, struct{}]) error {
+						return nil
+					})
+					db.Command[struct{}](subcommand, "", nil)
+					return execute(tb, app, []string{"-h"}, nil, nil).err
+				},
+				want: "the command db migrate has no handler and no subcommands",
+			},
+			{
+				name: "returns ErrDeclaration for a command with subcommands and a positional argument",
+				give: nestedDeclared[struct{}, struct {
+					Name string `arg:""`
+				}, struct{}],
+				want: "the command db has subcommands and the positional argument NAME",
+			},
+			{
+				name: "returns ErrDeclaration for a subcommand name that is not a name of lower-case words",
+				give: func(tb assert.TB) error {
+					tb.Helper()
+					app := cli.New[struct{}](appName, appHelp)
+					db := app.Command[struct{}](parent, parentHelp, nil)
+					db.Command("Migrate", "", func(context.Context, *cli.Run[struct{}, struct{}]) error { return nil })
+					return execute(tb, app, []string{"-h"}, nil, nil).err
+				},
+				want: `the command name "Migrate" is not a name of lower-case words`,
+			},
+			{
+				name: "returns ErrDeclaration for two subcommands of one name",
+				give: func(tb assert.TB) error {
+					tb.Helper()
+					app := cli.New[struct{}](appName, appHelp)
+					db := app.Command[struct{}](parent, parentHelp, nil)
+					for range 2 {
+						db.Command(
+							subcommand,
+							"",
+							func(context.Context, *cli.Run[struct{}, struct{}]) error { return nil },
+						)
+					}
+					return execute(tb, app, []string{"-h"}, nil, nil).err
+				},
+				want: "two commands have the name db migrate",
+			},
+			{
+				name: "returns ErrDeclaration for an option of a subcommand with the flag of an option of its command",
+				give: nestedDeclared[struct{}, struct{ Steps int }, struct{ Steps int }],
+				want: "two options of the command db migrate declare the flag --steps",
+			},
+			{
+				name: "returns ErrDeclaration for an option of a subcommand with the variable of an option of its command",
+				give: nestedDeclared[struct{}, struct{ MigrateSteps int }, struct{ Steps int }],
+				want: "two options of the command db migrate declare the environment variable SRV_DB_MIGRATE_STEPS",
+			},
+			{
+				name: "returns ErrDeclaration for an embedded pointer to a type without a conversion that is not a struct",
+				give: declared[struct{}, struct{ *Pipe }],
+				want: "has the type *cli_test.Pipe, which has no conversion",
+			},
+			{
+				name: "returns ErrDeclaration for a named pointer to a group",
+				give: declared[struct{}, struct{ DB *Store }],
+				want: "has the type *cli_test.Store, which has no conversion",
+			},
+			{
+				name: "returns ErrDeclaration for an embedded pointer without an ancestor of its options type",
+				give: declared[struct{}, struct{ *Store }],
+				want: "embeds *cli_test.Store without an ancestor with options of that type",
+			},
+			{
+				name: "returns ErrDeclaration for an embedded pointer with two ancestors of its options type",
+				give: func(tb assert.TB) error {
+					tb.Helper()
+					app := cli.New[struct{}](appName, appHelp)
+					backup := app.Command[Session](parent, parentHelp, nil).Command[Session]("backup", "", nil)
+					backup.Command("create", "", func(context.Context, *cli.Run[struct{}, struct{ *Session }]) error {
+						return nil
+					})
+					return execute(tb, app, []string{"-h"}, nil, nil).err
+				},
+				want: "embeds *cli_test.Session, and two ancestors have options of that type",
+			},
+			{
+				name: "returns ErrDeclaration for an unexported embedded pointer to the options of an ancestor",
+				give: nestedDeclared[struct{}, vault, struct{ *vault }],
+				want: "is unexported, so the package cannot set it to the options of an ancestor",
 			},
 			{
 				name: "returns ErrDeclaration for a positional argument of a map",
@@ -416,10 +559,10 @@ func TestDeclare(t *testing.T) {
 			t.Parallel()
 			app, _ := serving[struct{}, struct{}](t)
 			app.Format(nil, ".conf")
-			app.Command[struct{}]("migrate", "", nil)
+			app.Use(nil)
 			res := execute(t, app, []string{"-h"}, nil, nil)
 			assert.Equal(t, res.err.Error(), "cli: invalid declaration: a format needs a decoder and an extension\n"+
-				"cli: invalid declaration: the command migrate has no handler", "Execute returns both registrations")
+				"cli: invalid declaration: the app srv has a nil hook", "Execute returns both registrations")
 		})
 
 		t.Run("returns ErrDeclaration for a config key of a map in one command and of a value in another",
@@ -543,6 +686,15 @@ func TestDeclare(t *testing.T) {
 				},
 			},
 			{
+				name: "accepts a positional argument of the global options of an app without commands",
+				give: func(tb assert.TB) error {
+					tb.Helper()
+					app := cli.New[filesGlobal](appName, appHelp)
+					app.Handle(func(context.Context, *cli.Run[filesGlobal, filesGlobal]) error { return nil })
+					return execute(tb, app, []string{"-h"}, nil, nil).err
+				},
+			},
+			{
 				name: "accepts one config key of a map for two commands",
 				give: func(tb assert.TB) error {
 					tb.Helper()
@@ -585,6 +737,38 @@ func TestDeclare(t *testing.T) {
 			expect.Equal(t, got.Config().tls, tlsOptions{}, "the run does not set an unexported group")
 			expect.Equal(t, got.Config().rank, rank(0), "the run does not set an embedded field of an unexported type")
 		})
+
+		t.Run("sets an embedded pointer to the options of an ancestor", func(t *testing.T) {
+			t.Parallel()
+			app, _, migrate := nesting[struct{}, Store, stepsOptions](t)
+			res := execute(t, app, []string{parent, subcommand}, map[string]string{"SRV_DB_DSN": "pg"}, nil)
+			assert.NoError(t, res.err, "Execute runs the subcommand")
+			assert.NotNil(t, migrate.Config().Store, "the run sets the embedded pointer")
+			assert.Equal(t, migrate.Config().DSN, "pg", "the subcommand reads the option of its command")
+		})
+
+		t.Run("sets an embedded pointer to the global options", func(t *testing.T) {
+			t.Parallel()
+			app, got := serving[Settings, settingsOptions](t)
+			res := execute(t, app, []string{command, "--verbose"}, nil, nil)
+			assert.NoError(t, res.err, "Execute runs the command")
+			assert.Equal(t, got.Config().Settings, got.Global(), "the embedded pointer points to the global options",
+				assert.ByIdentity())
+		})
+
+		t.Run(
+			"leaves an unexported embedded pointer without an ancestor of its options type at nil",
+			func(t *testing.T) {
+				t.Parallel()
+				app, got := serving[struct{}, struct {
+					*vault
+					Port int
+				}](t)
+				res := execute(t, app, []string{command, "--port", "8"}, nil, nil)
+				assert.NoError(t, res.err, "Execute runs the command")
+				assert.Nil(t, got.Config().vault, "the run does not set the pointer")
+			},
+		)
 
 		t.Run("declares the options of an embedded struct with a prefix in a group", func(t *testing.T) {
 			t.Parallel()

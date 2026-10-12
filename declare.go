@@ -4,6 +4,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"maps"
@@ -38,30 +39,86 @@ var optionTags = [...]tag{
 // none is the value of the tags env and key that removes the environment variable or the config key.
 const none = "-"
 
-// declaration is the options of an app for one run: the global options, the options of each
-// command and the config keys of the app.
+// declaration is the options of an app for one run: the tree of its commands with their options,
+// and the config keys of the app.
 type declaration[G any] struct {
-	global   *G
-	debug    *option         // the option --flag-debug, the last global option
-	dicts    map[string]bool // the config key of each option of the app, true for the key of a map
-	globals  []*option       // the global options in the order of their fields
-	commands []*binding[G]   // the commands in the order of their registration
+	global *G
+	debug  *option         // the option --flag-debug, the last option of the app
+	dicts  map[string]bool // the config key of each option of the app, true for the key of a map
+	root   *binding[G]     // the app, whose options are the global options
 }
 
-// binding is a command of one run with its options and its handler over them.
+// binding is a command of one run. It contains a new value of the options of the command, the
+// options of the fields of that value, and the hooks, the handler and the subcommands of the
+// command over it.
 type binding[G any] struct {
-	cmd     *command[G]
-	call    handler[G]
-	options []*option // the options of the command in the order of their fields
+	value  reflect.Value // the pointer to the options of the command
+	parent *binding[G]   // the parent command, or nil for the app
+	// hooks calls the hooks of the command around next.
+	hooks func(ctx context.Context, inv *invocation[G], next func(context.Context) error) error
+	// handle calls the handler of the command. It is nil for a command without a handler.
+	handle    func(ctx context.Context, inv *invocation[G]) error
+	name      string        // the name of the command, or empty for the app
+	path      string        // the names of the path of the command joined with spaces, or empty for the app
+	help      string        // the help text of the command
+	options   []*option     // the options of the command in the order of their fields
+	inherited []*option     // the options of the ancestors of the command, the app first
+	children  []*binding[G] // the subcommands in the order of their registration
+}
+
+// newBinding returns the binding of a command whose options are the value at config, with the
+// given hooks and the handler handle of the command. A nil handle gives a binding without a
+// handler.
+func newBinding[G, C any](
+	config *C,
+	hooks []Hook[G, C],
+	handle func(ctx context.Context, run *Run[G, C]) error,
+) *binding[G] {
+	b := &binding[G]{value: reflect.ValueOf(config)}
+	b.hooks = func(ctx context.Context, inv *invocation[G], next func(context.Context) error) error {
+		return chain(ctx, &Run[G, C]{invocation: *inv, config: config}, hooks, next)
+	}
+	if handle != nil {
+		b.handle = func(ctx context.Context, inv *invocation[G]) error {
+			return handle(ctx, &Run[G, C]{invocation: *inv, config: config})
+		}
+	}
+	return b
+}
+
+// checkTree returns an error that wraps ErrDeclaration when b has neither a handler nor subcommands,
+// and when b has both subcommands and a positional argument. owner names b in the message, noun is
+// the word for its subcommands, and children is their number.
+func (b *binding[G]) checkTree(owner, noun string, children int) error {
+	i := slices.IndexFunc(b.options, func(o *option) bool { return o.arg })
+	switch {
+	case b.handle == nil && children == 0:
+		return fmt.Errorf("%w: %s has no handler and no %s", ErrDeclaration, owner, noun)
+	case children > 0 && i >= 0:
+		return fmt.Errorf("%w: %s has %s and the positional argument %s",
+			ErrDeclaration, owner, noun, b.options[i].label())
+	}
+	return nil
+}
+
+// around calls the hooks of the commands of the path of b from the app down, and next inside the
+// last hook of b.
+func (b *binding[G]) around(ctx context.Context, inv *invocation[G], next func(context.Context) error) error {
+	if b.parent == nil {
+		return b.hooks(ctx, inv, next)
+	}
+	return b.parent.around(ctx, inv, func(ctx context.Context) error {
+		return b.hooks(ctx, inv, next)
+	})
 }
 
 // declare returns the declaration of the app for one run.
 //
 // Error modes:
-//   - an error that wraps ErrDeclaration for an invalid registration, an app name that is not a name
-//     of lower-case words, and a command name that is not one or that two commands share.
-//   - the errors of options for the options of the app and of each command.
-//   - the errors of check for the global options and for the options of each command.
+//   - an error that wraps ErrDeclaration for an invalid registration and for an app name that is
+//     not a name of lower-case words.
+//   - the errors of options for the global options.
+//   - the errors of walk for the app and its commands.
 //   - the errors of keys for the config keys of the app.
 func (a *App[G]) declare() (*declaration[G], error) {
 	if err := errors.Join(a.errs...); err != nil {
@@ -71,38 +128,71 @@ func (a *App[G]) declare() (*declaration[G], error) {
 		return nil, fmt.Errorf("%w: the app name %q is not a name of lower-case words", ErrDeclaration, a.name)
 	}
 	d := &declaration[G]{global: new(G), dicts: map[string]bool{}}
-	root := scope{app: a.name, path: reflect.TypeFor[G]().String()}
+	root := &scope{app: a.name, path: reflect.TypeFor[G]().String()}
 	globals, err := a.options(nil, reflect.ValueOf(d.global).Elem(), root)
 	if err != nil {
 		return nil, err
 	}
 	d.debug = debugOption(root)
-	d.globals = slices.Concat(globals, []*option{d.debug})
-	if err := check(d.globals, ""); err != nil {
+	d.root = newBinding(d.global, a.hooks, a.handle)
+	d.root.options, d.root.help = slices.Concat(globals, []*option{d.debug}), a.help
+	all, err := a.walk(d.root, "the app "+a.name, "commands", a.commands, nil)
+	if err != nil {
 		return nil, err
-	}
-	all := slices.Clone(d.globals)
-	for _, c := range a.commands {
-		if !namePattern.MatchString(c.name) {
-			return nil, fmt.Errorf("%w: the command name %q is not a name of lower-case words", ErrDeclaration, c.name)
-		}
-		if slices.ContainsFunc(d.commands, func(b *binding[G]) bool { return b.cmd.name == c.name }) {
-			return nil, fmt.Errorf("%w: two commands have the name %s", ErrDeclaration, c.name)
-		}
-		options, call, err := c.bind(scope{app: a.name, command: c.name})
-		if err != nil {
-			return nil, err
-		}
-		if err := check(slices.Concat(d.globals, options), c.name); err != nil {
-			return nil, err
-		}
-		d.commands = append(d.commands, &binding[G]{cmd: c, call: call, options: options})
-		all = append(all, options...)
 	}
 	if err := d.keys(all); err != nil {
 		return nil, err
 	}
 	return d, nil
+}
+
+// walk checks the options of the path of the command b and the rules of checkTree for b, then binds
+// the commands of children as its subcommands. owner names b in a message, and noun is the word for
+// its subcommands. walk returns all with the options of b and of each of its descendants.
+//
+// Error modes:
+//   - the errors of check, of checkTree and of bindAll.
+func (a *App[G]) walk(b *binding[G], owner, noun string, children []*command[G], all []*option) ([]*option, error) {
+	if err := check(slices.Concat(b.inherited, b.options), b.path); err != nil {
+		return nil, err
+	}
+	if err := b.checkTree(owner, noun, len(children)); err != nil {
+		return nil, err
+	}
+	return a.bindAll(b, children, append(all, b.options...))
+}
+
+// bindAll binds each command of cmds as a subcommand of the command parent, and walks each. It
+// returns all with the options of every command that it binds.
+//
+// Error modes:
+//   - an error that wraps ErrDeclaration for a command name that is not a name of lower-case words,
+//     and for two subcommands of parent with one name.
+//   - the errors of bind and of walk for each command.
+func (a *App[G]) bindAll(parent *binding[G], cmds []*command[G], all []*option) ([]*option, error) {
+	var ancestors []reflect.Value
+	for p := parent; p != nil; p = p.parent {
+		ancestors = append(ancestors, p.value)
+	}
+	for _, c := range cmds {
+		if !namePattern.MatchString(c.name) {
+			return nil, fmt.Errorf("%w: the command name %q is not a name of lower-case words", ErrDeclaration, c.name)
+		}
+		if slices.ContainsFunc(parent.children, func(b *binding[G]) bool { return b.name == c.name }) {
+			return nil, fmt.Errorf("%w: two commands have the name %s", ErrDeclaration, c.path)
+		}
+		b, err := c.bind(&scope{app: a.name, command: strings.Fields(c.path), ancestors: ancestors})
+		if err != nil {
+			return nil, err
+		}
+		b.parent, b.name, b.path, b.help = parent, c.name, c.path, c.help
+		b.inherited = slices.Concat(parent.inherited, parent.options)
+		parent.children = append(parent.children, b)
+		if all, err = a.walk(b, "the command "+c.path, "subcommands", c.children, all); err != nil {
+			return nil, err
+		}
+	}
+	return all, nil
 }
 
 // keys records the config key of each option of all in d.dicts.
@@ -136,16 +226,24 @@ func (d *declaration[G]) keys(all []*option) error {
 // options appends to opts an option for each exported field of the struct v in the scope s, in the
 // order of the fields, and returns opts. A struct field without a conversion is a group, whose
 // fields are options in the scope that nest returns. An embedded group adds the exported fields of
-// its type also when its type is unexported.
+// its type also when its type is unexported. An embedded pointer to a group does not add options,
+// and inherit sets it to the options of an ancestor.
 //
 // Error modes:
 //   - an error that wraps ErrDeclaration when v is not a struct.
-//   - the errors of nest and of newOption.
-func (a *App[G]) options(opts []*option, v reflect.Value, s scope) ([]*option, error) {
+//   - the errors of inherit, of nest and of newOption.
+func (a *App[G]) options(opts []*option, v reflect.Value, s *scope) ([]*option, error) {
 	if v.Kind() != reflect.Struct {
 		return nil, fmt.Errorf("%w: the options type %s is not a struct", ErrDeclaration, v.Type())
 	}
 	for f, field := range v.Fields() {
+		embedded := f.Anonymous && f.Type.Kind() == reflect.Pointer
+		if embedded && f.Type.Elem().Kind() == reflect.Struct && a.converter(f.Type.Elem()) == nil {
+			if err := s.inherit(&f, field); err != nil {
+				return nil, err
+			}
+			continue
+		}
 		group := f.Type.Kind() == reflect.Struct && a.converter(f.Type) == nil
 		if !f.IsExported() && (!group || !f.Anonymous) {
 			continue
@@ -162,7 +260,7 @@ func (a *App[G]) options(opts []*option, v reflect.Value, s scope) ([]*option, e
 		if err != nil {
 			return nil, err
 		}
-		if opts, err = a.options(opts, field, nested); err != nil {
+		if opts, err = a.options(opts, field, &nested); err != nil {
 			return nil, err
 		}
 	}
@@ -176,7 +274,7 @@ func (a *App[G]) options(opts []*option, v reflect.Value, s scope) ([]*option, e
 //     is not a name of lower-case words, a short flag that is not one ASCII letter other than h, an
 //     empty tag env or key, a config key with an empty name, and for the reasons of argument,
 //     configFile and withDefault.
-func (a *App[G]) newOption(f *reflect.StructField, v reflect.Value, s scope) (*option, error) {
+func (a *App[G]) newOption(f *reflect.StructField, v reflect.Value, s *scope) (*option, error) {
 	field := s.path + "." + f.Name
 	if _, ok := f.Tag.Lookup(string(tagPrefix)); ok {
 		return nil, fmt.Errorf("%w: the field %s is no group, so it takes no tag prefix", ErrDeclaration, field)
@@ -231,7 +329,7 @@ func (a *App[G]) newOption(f *reflect.StructField, v reflect.Value, s scope) (*o
 			o.key = value
 		}
 	}
-	if reason := o.argument(f, s); reason != "" {
+	if reason := o.argument(f); reason != "" {
 		return nil, fmt.Errorf("%w: the field %s %s", ErrDeclaration, field, reason)
 	}
 	if reason := o.configFile(f); reason != "" {
@@ -269,14 +367,12 @@ func (a *App[G]) setShape(o *option, t reflect.Type) string {
 
 // argument removes the environment variable and the config key of the option o of a field with
 // the tag arg, because only the command line sets a positional argument. It returns the reason
-// when o cannot be a positional argument: an argument of the global options, which come before the
-// command, an argument of a map, and an argument with a tag short, env or key.
-func (o *option) argument(f *reflect.StructField, s scope) string {
+// when o cannot be a positional argument: an argument of a map, and an argument with a tag short,
+// env or key.
+func (o *option) argument(f *reflect.StructField) string {
 	switch {
 	case !o.arg:
 		return ""
-	case s.command == "":
-		return "is a positional argument of the global options, which come before the command"
 	case o.shape == dict:
 		return "is a positional argument of a map, which takes no entries"
 	}
@@ -380,5 +476,37 @@ func check(opts []*option, command string) error {
 			seen[n] = true
 		}
 	}
+	return nil
+}
+
+// inherit sets the embedded pointer v of the field f to the options of the ancestor whose options
+// have the type of the target of f. It leaves v nil when f is unexported and the type is not the
+// options type of an ancestor, because the package ignores an unexported field.
+//
+// Error modes:
+//   - an error that wraps ErrDeclaration when the type is not the options type of an ancestor, when
+//     it is the options type of two ancestors, and when f is unexported.
+func (s *scope) inherit(f *reflect.StructField, v reflect.Value) error {
+	field := s.path + "." + f.Name
+	var found []reflect.Value
+	for _, a := range s.ancestors {
+		if a.Type() == f.Type {
+			found = append(found, a)
+		}
+	}
+	switch {
+	case len(found) == 0 && !f.IsExported():
+		return nil
+	case len(found) == 0:
+		return fmt.Errorf("%w: the field %s embeds %s without an ancestor with options of that type",
+			ErrDeclaration, field, f.Type)
+	case len(found) > 1:
+		return fmt.Errorf("%w: the field %s embeds %s, and two ancestors have options of that type",
+			ErrDeclaration, field, f.Type)
+	case !f.IsExported():
+		return fmt.Errorf("%w: the field %s is unexported, so the package cannot set it to the options of an ancestor",
+			ErrDeclaration, field)
+	}
+	v.Set(found[0])
 	return nil
 }

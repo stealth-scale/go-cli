@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 )
 
@@ -22,20 +23,25 @@ const (
 	ExitUsage = 2
 )
 
-// App is a command-line program with the global options G and its commands. [New] returns one, and
-// [App.Command] adds each command.
+// App is a command-line program with the global options G. The app is the command at the root of
+// the tree of its commands, so the global options are its options. [New] returns one, and
+// [App.Command] adds each command. [App.Handle] sets the handler of the app, and [App.Use] adds a
+// hook that every run calls.
 //
 // # Concurrency
 //
-// Execute and Main are safe for concurrent use once the last call of Command, Convert, Format and
-// Render has returned. Command, Convert, Format and Render are not safe for concurrent use.
+// Execute and Main are safe for concurrent use once the last registration has returned. The
+// registrations are the calls of Command, Convert, Format, Handle, Render and Use of the app, and of
+// Command and Use of its commands. They are not safe for concurrent use.
 type App[G any] struct {
-	renderer   Renderer                   // the renderer of the help, the failures and --flag-debug
-	converters map[reflect.Type]converter // the conversions of Convert, and the built-in ones
-	formats    map[string]Format          // the formats of config files by their extension in lower case
+	renderer   Renderer                                        // the renderer of the help, the failures and --flag-debug
+	converters map[reflect.Type]converter                      // the conversions of Convert, and the built-in ones
+	formats    map[string]Format                               // the formats of config files by their extension in lower case
+	handle     func(ctx context.Context, run *Run[G, G]) error // the handler of the app, or nil
 	name       string
 	help       string
 	commands   []*command[G] // the commands in the order of their registration
+	hooks      []Hook[G, G]  // the hooks of the app in the order of their registration
 	errs       []error       // the invalid registrations, which Execute returns
 }
 
@@ -53,37 +59,55 @@ func New[G any](name, help string) *App[G] {
 	}
 }
 
-// Command adds the command name with the help text help. The exported fields of C are the options
-// of the command. A run of the command calls handle with the options after every source is
-// applied, and returns the error of handle unchanged.
+// Command adds the command name with the help text help to the app and returns it. The exported
+// fields of C are the options of the command. A run of the command calls handle with the options
+// after every source is applied, and returns the error of handle unchanged. A command with a nil
+// handle runs only its subcommands.
 //
-// [App.Execute] returns an error that wraps [ErrDeclaration] when handle is nil, when name is not a
-// name of lower-case words, and when two commands have one name.
-func (a *App[G]) Command[C any](name, help string, handle func(ctx context.Context, run *Run[G, C]) error) {
-	if handle == nil {
-		a.errs = append(a.errs, fmt.Errorf("%w: the command %s has no handler", ErrDeclaration, name))
-		return
-	}
-	a.commands = append(a.commands, &command[G]{
-		name: name,
-		help: help,
-		bind: func(s scope) ([]*option, handler[G], error) {
-			config := new(C)
-			s.path = reflect.TypeFor[C]().String()
-			list, err := a.options(nil, reflect.ValueOf(config).Elem(), s)
-			call := func(ctx context.Context, global *G, env *Env, sources map[any]Source) error {
-				return handle(ctx, &Run[G, C]{global: global, config: config, env: env, sources: sources})
-			}
-			return list, call, err
-		},
-	})
+// [App.Execute] returns an error that wraps [ErrDeclaration] when name is not a name of lower-case
+// words, when the app has a command of that name already, when handle is nil for a command without
+// subcommands, and when the command has subcommands and declares a positional argument.
+func (a *App[G]) Command[C any](
+	name, help string,
+	handle func(ctx context.Context, run *Run[G, C]) error,
+) *Command[G, C] {
+	c := newCommand(a, name, name, help, handle)
+	a.commands = append(a.commands, c.cmd)
+	return c
 }
 
-// Execute runs the command that env.Args selects, and returns the error of its handler. The flag -h
-// or --help writes the help of the command, or of the app before a command, to env.Stdout and
-// returns nil. A command line without a command writes the help of the app to env.Stderr. The
-// global flag --flag-debug writes the value and the source of each option to env.Stderr before the
-// handler runs. The renderer of the app writes the help and the output of --flag-debug.
+// Handle sets the handler of the app. A command line without a command calls handle with the
+// global options as the options of the run. A later call replaces an earlier one.
+//
+// [App.Execute] returns an error that wraps [ErrDeclaration] when handle is nil.
+func (a *App[G]) Handle(handle func(ctx context.Context, run *Run[G, G]) error) {
+	if handle == nil {
+		a.errs = append(a.errs, fmt.Errorf("%w: the app %s has a nil handler", ErrDeclaration, a.name))
+		return
+	}
+	a.handle = handle
+}
+
+// Use adds hook to the app, so every run calls hook before the hooks of its commands. The hooks of
+// the app run in the order of the calls of Use. The run of a hook of the app contains the global
+// options as the options of its command.
+//
+// [App.Execute] returns an error that wraps [ErrDeclaration] when hook is nil.
+func (a *App[G]) Use(hook Hook[G, G]) {
+	if hook == nil {
+		a.errs = append(a.errs, fmt.Errorf("%w: the app %s has a nil hook", ErrDeclaration, a.name))
+		return
+	}
+	a.hooks = append(a.hooks, hook)
+}
+
+// Execute runs the command that env.Args selects, and returns the error of its handler. The hooks of
+// the app and of each command of the path run around the handler, the app first. The flag -h or
+// --help writes the help of the last command of the path, or of the app, to env.Stdout and returns
+// nil. A path that ends at a command without a handler writes the help of that command and a blank
+// line to env.Stderr. The blank line separates the help from the failure that [App.Main] writes.
+// The global flag --flag-debug writes the value and the source of each option to env.Stderr before
+// the hooks run. The renderer of the app writes the help and the output of --flag-debug.
 //
 // Execute checks the options of every command before it reads the command line, so a run of any
 // command reports a declaration that the app cannot run.
@@ -91,11 +115,13 @@ func (a *App[G]) Command[C any](name, help string, handle func(ctx context.Conte
 // Error modes:
 //   - an error that wraps [ErrEnv] when env is nil, or has no Stdout or no Stderr.
 //   - an error that wraps [ErrDeclaration] for a registration or options that the app cannot run.
-//   - an [*Error] for an invalid command line, environment variable or config file, and for a
-//     command line without a command.
+//   - an [*Error] for an invalid command line, environment variable or config file, and for a path
+//     that ends at a command without a handler.
 //   - the error of the renderer, unchanged, when the help or the output of --flag-debug fails to
 //     write.
-//   - the error of the handler, unchanged.
+//   - an error that wraps the error of env.Stderr when the blank line after the help fails to
+//     write.
+//   - the error of the handler, unchanged, or the error that a hook returns in its place.
 func (a *App[G]) Execute(ctx context.Context, env *Env) error {
 	if err := env.check(); err != nil {
 		return err
@@ -104,18 +130,21 @@ func (a *App[G]) Execute(ctx context.Context, env *Env) error {
 	if err != nil {
 		return err
 	}
-	in := &input[G]{list: d.globals}
-	if err := in.scan(d, env.Args); err != nil {
+	in := &input[G]{cmd: d.root, list: d.root.options}
+	if err := in.scan(env.Args); err != nil {
 		return in.locate(err)
 	}
 	if in.help {
-		return a.renderer.Help(env.Stdout, env.environ(), a.helpOf(d, in))
+		return a.renderer.Help(env.Stdout, env.environ(), a.helpOf(in))
 	}
-	if in.cmd == nil {
-		if err := a.renderer.Help(env.Stderr, env.environ(), a.helpOf(d, in)); err != nil {
+	if in.cmd.handle == nil {
+		if err := a.renderer.Help(env.Stderr, env.environ(), a.helpOf(in)); err != nil {
 			return err
 		}
-		return &Error{Err: ErrMissing, text: "missing command"}
+		if _, err := io.WriteString(env.Stderr, "\n"); err != nil {
+			return fmt.Errorf("cli: write the help: %w", err)
+		}
+		return in.locate(&Error{Err: ErrMissing, text: "missing command"})
 	}
 	if err := a.resolve(env, d, in); err != nil {
 		return in.locate(err)
@@ -125,7 +154,10 @@ func (a *App[G]) Execute(ctx context.Context, env *Env) error {
 			return err
 		}
 	}
-	return in.cmd.call(ctx, d.global, env, in.sources())
+	inv := &invocation[G]{global: d.global, env: env, sources: in.sources(), command: in.cmd.path}
+	return in.cmd.around(ctx, inv, func(ctx context.Context) error {
+		return in.cmd.handle(ctx, inv)
+	})
 }
 
 // Main runs [App.Execute] and returns the exit status for os.Exit. The renderer of the app writes
@@ -151,16 +183,4 @@ func (a *App[G]) Main(ctx context.Context, env *Env) int {
 		_ = a.renderer.Error(env.Stderr, env.environ(), f)
 	}
 	return status
-}
-
-// handler calls the handler of a command with the global options, the Env and the sources of a run.
-type handler[G any] func(ctx context.Context, global *G, env *Env, sources map[any]Source) error
-
-// command is a command of an app with the global options G.
-type command[G any] struct {
-	// bind returns the options of a new value of the options of the command in the scope s, and the
-	// handler of the command over that value.
-	bind func(s scope) ([]*option, handler[G], error)
-	name string
-	help string
 }

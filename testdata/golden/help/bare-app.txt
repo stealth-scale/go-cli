@@ -1,6 +1,6 @@
-Usage: srv [global options] <command> [options]
+Usage: srv [options]
 
-Global options:
+Options:
       --config file                                                                          env SRV_CONFIG
       --flag-debug   Print the value and the source of each option before the command runs.  env SRV_FLAG_DEBUG
   -h, --help         Show the help.

@@ -1,4 +1,4 @@
-Usage: srv [global options] <command> [options]
+Usage: srv <command> [options]
 
 Serve the store.
 
@@ -6,7 +6,7 @@ Commands:
   serve    Run the server.
   migrate  Run the migrations.
 
-Global options:
+Options:
   -c, --config file  Config file in JSON or INI.                                             env SRV_CONFIG
       --flag-debug   Print the value and the source of each option before the command runs.  env SRV_FLAG_DEBUG
   -h, --help         Show the help.

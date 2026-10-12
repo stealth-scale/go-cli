@@ -11,9 +11,9 @@ const prefix = "cli: "
 // The sentinels of the errors of [App.Execute]. An [*Error] wraps one of the first seven, and an
 // error that wraps one of the last two reports a defect of the program.
 var (
-	// ErrUnknownCommand reports a command that the app does not declare.
+	// ErrUnknownCommand reports a command that the app or the command before it does not declare.
 	ErrUnknownCommand = errors.New("cli: unknown command")
-	// ErrUnknownFlag reports a flag that neither the global options nor the command declares.
+	// ErrUnknownFlag reports a flag that the app and the commands of the path do not declare.
 	ErrUnknownFlag = errors.New("cli: unknown flag")
 	// ErrUnknownKey reports a key of a config file that no option of the app declares.
 	ErrUnknownKey = errors.New("cli: unknown config key")
@@ -44,7 +44,7 @@ var (
 // An Error does not change after [App.Execute] returns it, so any number of goroutines may read it.
 type Error struct {
 	Err        error  // the sentinel
-	Command    string // the command of the run, or empty for an input before the command
+	Command    string // the path of the command of the input, such as db migrate, or empty for the app
 	Input      string // the command, the flag, the config key, the argument or the config file at fault
 	Value      string // the value at fault, or empty
 	Suggestion string // the name that the package suggests in place of Input, or empty

@@ -12,22 +12,24 @@ import (
 // Help contains the help of an app or of one of its commands for a [Renderer].
 type Help struct {
 	App     string // the name of the app
-	Command string // the name of the command, or empty for the help of the app
+	Command string // the path of the command, such as db migrate, or empty for the help of the app
 	Text    string // the help text of the app or of the command
 	// Usage contains the parts of the usage line after the names, such as "[options]" and "[NAME]".
 	Usage []string
-	// Commands contains the commands of the app in the order of their registration. The help of a
-	// command does not list commands.
+	// Commands contains the commands of the app or the subcommands of the command in the order of
+	// their registration.
 	Commands []HelpCommand
 	// Arguments contains the positional arguments of the command in the order of their fields.
 	Arguments []HelpOption
-	// Options contains the options of the command in the order of their flags.
+	// Options contains the options of the command in the order of their flags. In the help of the
+	// app, Options contains the global options and the flags of the help.
 	Options []HelpOption
-	// Globals contains the global options in the order of their flags. -h and --help are among them.
+	// Globals contains the options of the ancestors of the command in the order of their flags. The
+	// flags of the help are among them. Globals is empty in the help of the app.
 	Globals []HelpOption
 }
 
-// HelpCommand is a command in the help of an app.
+// HelpCommand is a command or a subcommand in the help.
 type HelpCommand struct {
 	Name string // the name of the command, such as serve
 	Text string // the help text of the command
@@ -56,7 +58,7 @@ type DebugRow struct {
 type Failure struct {
 	Err        error  // the error of the run
 	App        string // the name of the app
-	Command    string // the command of the run, or empty
+	Command    string // the path of the command of the run, such as db migrate, or empty
 	Message    string // the message without the names and the suggestion
 	Suggestion string // the name that the package suggests in place of the input, or empty
 	Usage      bool   // the error is an invalid command line, environment variable or config file

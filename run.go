@@ -9,19 +9,27 @@ import (
 	"strings"
 )
 
-// Run is one call of a handler with the global options G and the options C of its command. It
-// returns the options after every source is applied, the standard streams of the run and the source
-// of each option.
+// Run is one call of a handler or of a hook with the global options G and the options C of its
+// command. It returns the options after every source is applied, the standard streams of the run,
+// the source of each option and the path of the command of the run.
 //
 // # Concurrency
 //
 // The methods of a Run are safe for concurrent use. The options that Global and Config return are
 // the handler's own, so a handler that starts goroutines guards what they change.
 type Run[G, C any] struct {
+	config *C
+	invocation[G]
+}
+
+// invocation is the part of a run that the hooks and the handler of every command of its path
+// share. It contains the global options, the Env, the source of each option and the path of the
+// command of the run.
+type invocation[G any] struct {
 	global  *G
-	config  *C
 	env     *Env
 	sources map[any]Source // the source of each option, by a pointer to its field
+	command string         // the path of the command of the run, or empty for the handler of the app
 }
 
 // NewRun returns a run of global and config with the streams of env, for a test that calls a
@@ -37,7 +45,7 @@ func NewRun[G, C any](global *G, config *C, env *Env) (*Run[G, C], error) {
 	if global == nil || config == nil {
 		return nil, fmt.Errorf("%w: a run needs the global options and the options of its command", ErrDeclaration)
 	}
-	return &Run[G, C]{global: global, config: config, env: env}, nil
+	return &Run[G, C]{global: global, env: env, config: config}, nil
 }
 
 // Global returns the global options of the run.
@@ -75,10 +83,16 @@ func (r *Run[G, C]) Environ() []string {
 	return r.env.environ()
 }
 
-// Source returns the source of the option at field, a pointer to a field of [Run.Global] or
-// [Run.Config]. It reports false for any other pointer, and for every option of a run that
-// [NewRun] returns.
+// Source returns the source of the option at field, a pointer to the field of an option of the app
+// or of a command of the path of the run. It reports false for any other pointer, and for every
+// option of a run that [NewRun] returns.
 func (r *Run[G, C]) Source(field any) (Source, bool) {
 	s, ok := r.sources[field]
 	return s, ok
+}
+
+// Command returns the path of the command that the run calls, such as "db migrate". It returns the
+// empty string in a run of the handler of the app and in a run that [NewRun] returns.
+func (r *Run[G, C]) Command() string {
+	return r.command
 }

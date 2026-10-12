@@ -29,10 +29,11 @@ const (
 	helpLong = flagPrefix + helpName
 )
 
-// input is the command line of one run: its command, its flags and its positional arguments.
+// input is the command line of one run: the path of its command, its flags and its positional
+// arguments.
 type input[G any] struct {
-	cmd   *binding[G]  // the command, or nil before scan reads one
-	list  []*option    // the global options, then the options of cmd
+	cmd   *binding[G]  // the last command of the path, which starts at the app
+	list  []*option    // the options of the app and of each command of the path
 	flags []occurrence // the flags in the order of the command line
 	args  []string     // the positional arguments
 	help  bool         // the command line contains a flag of the help
@@ -44,21 +45,25 @@ type occurrence struct {
 	value string
 }
 
-// scan splits args into the command of d, its flags and its positional arguments, by these rules of
-// GNU:
+// scan splits args into the path of the command of the run, its flags and its positional arguments,
+// by these rules of GNU:
 //   - A long flag starts with two dashes. It takes its value after an equals sign or in the next
 //     argument.
 //   - Short flags combine in a cluster after one dash, such as -vq. A short flag with a value takes
 //     the rest of its cluster or the next argument, such as -p8080 or -p 8080.
 //   - The flag of a bool takes a value only after an equals sign.
-//   - A global flag can come before or after the command. The flags of the command come after it.
+//   - After a command with subcommands, an argument that is not a flag is the name of a subcommand.
+//     After a command without subcommands, it is a positional argument.
+//   - A flag can come anywhere after the name of the command that declares it, and a flag of the app
+//     anywhere.
 //   - The argument -- ends the flags. A lone - is a positional argument.
 //
 // Error modes:
-//   - an *Error that wraps ErrUnknownCommand for a command that d does not declare.
-//   - an *Error that wraps ErrUnknownFlag for a flag that no option of the run declares.
+//   - an *Error that wraps ErrUnknownCommand for a name that the command before it does not
+//     declare.
+//   - an *Error that wraps ErrUnknownFlag for a flag that no option of the path declares.
 //   - an *Error that wraps ErrMissing for a flag without its value at the end of args.
-func (in *input[G]) scan(d *declaration[G], args []string) error {
+func (in *input[G]) scan(args []string) error {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		switch {
@@ -79,12 +84,12 @@ func (in *input[G]) scan(d *declaration[G], args []string) error {
 				return err
 			}
 			i = next
-		case in.cmd == nil:
-			j := slices.IndexFunc(d.commands, func(b *binding[G]) bool { return b.cmd.name == arg })
+		case len(in.cmd.children) > 0:
+			j := slices.IndexFunc(in.cmd.children, func(b *binding[G]) bool { return b.name == arg })
 			if j < 0 {
-				names := make([]string, len(d.commands))
-				for k, b := range d.commands {
-					names[k] = b.cmd.name
+				names := make([]string, len(in.cmd.children))
+				for k, b := range in.cmd.children {
+					names[k] = b.name
 				}
 				return &Error{
 					Err:        ErrUnknownCommand,
@@ -93,7 +98,7 @@ func (in *input[G]) scan(d *declaration[G], args []string) error {
 					text:       "unknown command " + strconv.Quote(arg),
 				}
 			}
-			in.cmd = d.commands[j]
+			in.cmd = in.cmd.children[j]
 			in.list = slices.Concat(in.list, in.cmd.options)
 		default:
 			in.args = append(in.args, arg)
@@ -179,12 +184,11 @@ func (in *input[G]) cluster(args []string, i int) (int, error) {
 	return i, nil
 }
 
-// locate sets the command of err to the command of in when err is an *Error and in has a command,
-// and returns err.
+// locate sets the command of err to the path of the last command of in when err is an *Error, and
+// returns err. The path of the app is empty.
 func (in *input[G]) locate(err error) error {
-	//dokimi:mutate-skip lcr-right: every error of scan and of resolve is an *Error
-	if e, ok := errors.AsType[*Error](err); ok && in.cmd != nil {
-		e.Command = in.cmd.cmd.name
+	if e, ok := errors.AsType[*Error](err); ok {
+		e.Command = in.cmd.path
 	}
 	return err
 }

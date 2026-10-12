@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"io"
 	"testing"
 
 	"go.dokimi.dev/assert"
@@ -17,33 +16,6 @@ import (
 
 // errRender is the error of a renderer that fails.
 var errRender = errors.New("main: the terminal is gone")
-
-// recorder is a Renderer that records what the package passes to it, and returns err.
-type recorder struct {
-	err     error
-	help    *cli.Help
-	failure *cli.Failure
-	environ []string
-	rows    []cli.DebugRow
-}
-
-// Help records h and environ.
-func (r *recorder) Help(_ io.Writer, environ []string, h *cli.Help) error {
-	r.help, r.environ = h, environ
-	return r.err
-}
-
-// Error records f and environ.
-func (r *recorder) Error(_ io.Writer, environ []string, f *cli.Failure) error {
-	r.failure, r.environ = f, environ
-	return r.err
-}
-
-// Debug records rows and environ.
-func (r *recorder) Debug(_ io.Writer, environ []string, rows []cli.DebugRow) error {
-	r.rows, r.environ = rows, environ
-	return r.err
-}
 
 // globalsHelp are the global options of an app of the options appGlobal in its help.
 var globalsHelp = []cli.HelpOption{
@@ -80,11 +52,11 @@ func TestRender(t *testing.T) {
 			assert.NoError(t, res.err, "Execute writes the help")
 			assert.Equal(t, r.help, &cli.Help{
 				App:      appName,
-				Usage:    []string{"[global options]", "<command>", "[options]"},
+				Usage:    []string{"<command>", "[options]"},
 				Text:     appHelp,
 				Commands: []cli.HelpCommand{{Name: command, Text: commandHelp}},
-				Globals:  globalsHelp,
-			}, "the renderer receives the usage, the text, the commands and the global options of the app")
+				Options:  globalsHelp,
+			}, "the renderer receives the usage, the text, the commands and the options of the app")
 		})
 
 		t.Run("passes the help of a command to the renderer", func(t *testing.T) {

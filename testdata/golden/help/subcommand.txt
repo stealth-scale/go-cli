@@ -1,0 +1,13 @@
+Usage: srv db migrate [options]
+
+Migrate the database to the current schema.
+
+Options:
+      --steps int  Number of migrations to apply.  env SRV_DB_MIGRATE_STEPS, key db.migrate.steps
+
+Global options:
+  -c, --config file  Config file in JSON or INI.                                             env SRV_CONFIG
+  -d, --dsn string   Data source name of the database.                                       env SRV_DB_DSN, key db.dsn
+      --flag-debug   Print the value and the source of each option before the command runs.  env SRV_FLAG_DEBUG
+  -h, --help         Show the help.
+  -v, --verbose      Log more.                                                               env SRV_VERBOSE, key verbose

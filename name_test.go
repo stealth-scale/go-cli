@@ -171,6 +171,55 @@ func TestName(t *testing.T) {
 			})
 		}
 
+		nested := []struct {
+			name      string
+			giveArgs  []string
+			giveVars  map[string]string
+			giveData  string
+			giveField func(run *cli.Run[nameGlobal, stepsOptions]) any
+			want      cli.Source
+		}{
+			{
+				name:      "joins the app, the path and the name in the variable of an option of a subcommand",
+				giveArgs:  []string{parent, subcommand},
+				giveVars:  map[string]string{"SRV_DB_MIGRATE_STEPS": "3"},
+				giveField: func(run *cli.Run[nameGlobal, stepsOptions]) any { return &run.Config().Steps },
+				want:      cli.Source{Kind: cli.Environment, Name: "SRV_DB_MIGRATE_STEPS"},
+			},
+			{
+				name:      "joins the app, the path of its command and the name in the variable of an inherited option",
+				giveArgs:  []string{parent, subcommand},
+				giveVars:  map[string]string{"SRV_DB_DSN": "pg"},
+				giveField: func(run *cli.Run[nameGlobal, stepsOptions]) any { return &run.Config().DSN },
+				want:      cli.Source{Kind: cli.Environment, Name: "SRV_DB_DSN"},
+			},
+			{
+				name:      "joins the path and the name in the config key of an option of a subcommand",
+				giveArgs:  []string{"--config", configPath, parent, subcommand},
+				giveData:  `{"db": {"migrate": {"steps": 3}}}`,
+				giveField: func(run *cli.Run[nameGlobal, stepsOptions]) any { return &run.Config().Steps },
+				want:      cli.Source{Kind: cli.File, Name: "db.migrate.steps", File: configPath},
+			},
+			{
+				name:      "nests the keys of a command and of its subcommand in one object of the config file",
+				giveArgs:  []string{"--config", configPath, parent, subcommand},
+				giveData:  `{"db": {"dsn": "pg", "migrate": {"steps": 3}}}`,
+				giveField: func(run *cli.Run[nameGlobal, stepsOptions]) any { return &run.Config().DSN },
+				want:      cli.Source{Kind: cli.File, Name: "db.dsn", File: configPath},
+			},
+		}
+		for _, tt := range nested {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+				app, _, migrate := nesting[nameGlobal, Store, stepsOptions](t)
+				res := execute(t, app, tt.giveArgs, tt.giveVars, fstest.MapFS{configPath: {Data: []byte(tt.giveData)}})
+				assert.NoError(t, res.err, "Execute runs the subcommand")
+				src, ok := migrate.Source(tt.giveField(migrate))
+				assert.True(t, ok, "the run has the source of the option")
+				assert.Equal(t, src, tt.want, "the source states the derived name")
+			})
+		}
+
 		t.Run("replaces each dash of the app name with an underscore in the variable", func(t *testing.T) {
 			t.Parallel()
 			var got int

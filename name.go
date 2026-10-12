@@ -27,12 +27,14 @@ const (
 // letters and digits that single dashes join, the first word starting with a letter.
 var namePattern = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
 
-// scope is the position of an options struct in the names of its options.
+// scope is the position of an options struct in the names of its options and in the tree of the
+// commands of the app.
 type scope struct {
-	app     string   // the name of the app
-	command string   // the name of the command, or empty for the global options
-	path    string   // the Go path of the struct in messages, such as main.Serve.Cache
-	groups  []string // the names of the groups that contain the struct, the outermost first
+	app       string          // the name of the app
+	path      string          // the Go path of the struct in messages, such as main.Serve.Cache
+	command   []string        // the names of the path of the command, or nil for the options of the app
+	groups    []string        // the names of the groups that contain the struct, the outermost first
+	ancestors []reflect.Value // the pointers to the options of the ancestors of the command
 }
 
 // nest returns the scope of the struct field f in s. A named field is a group, so the scope has its
@@ -42,7 +44,7 @@ type scope struct {
 // Error modes:
 //   - an error that wraps ErrDeclaration for a field with a tag of an option, and for a group name
 //     that is not a name of lower-case words.
-func (s scope) nest(f *reflect.StructField) (scope, error) {
+func (s *scope) nest(f *reflect.StructField) (scope, error) {
 	field := s.path + "." + f.Name
 	for _, t := range optionTags {
 		if _, ok := f.Tag.Lookup(string(t)); ok {
@@ -56,7 +58,8 @@ func (s scope) nest(f *reflect.StructField) (scope, error) {
 	if prefix, ok := f.Tag.Lookup(string(tagPrefix)); ok {
 		name = prefix
 	}
-	nested := scope{app: s.app, command: s.command, path: field, groups: s.groups}
+	nested := *s
+	nested.path = field
 	if name == "" {
 		return nested, nil
 	}
@@ -69,15 +72,13 @@ func (s scope) nest(f *reflect.StructField) (scope, error) {
 }
 
 // names returns the flag, the environment variable and the config key of the option name in s. The
-// flag joins the groups and the name with dashes. The environment variable joins the app, the
-// command, the groups and the name in upper case with underscores. The config key joins the
-// command, the groups and the name with dots.
-func (s scope) names(name string) (flag, env, key string) {
+// flag joins the groups and the name with dashes. The environment variable joins the app, the path
+// of the command, the groups and the name in upper case with underscores. The config key joins the
+// path of the command, the groups and the name with dots.
+func (s *scope) names(name string) (flag, env, key string) {
 	words := append(slices.Clone(s.groups), name)
 	flag = strings.Join(words, wordSeparator)
-	if s.command != "" {
-		words = slices.Insert(words, 0, s.command)
-	}
+	words = slices.Concat(s.command, words)
 	key = strings.Join(words, keySeparator)
 	env = strings.Join(slices.Insert(words, 0, s.app), envSeparator)
 	env = strings.ToUpper(strings.ReplaceAll(env, wordSeparator, envSeparator))

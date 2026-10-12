@@ -23,35 +23,44 @@ const (
 	ellipsis = "..."
 	// helpText is the help text of the flags of the help.
 	helpText = "Show the help."
+	// usageCommand takes the place of the name of a subcommand in the usage line.
+	usageCommand = "<command>"
+	// usageOptions takes the place of the flags in the usage line.
+	usageOptions = "[options]"
 )
 
-// helpOf returns the help of the command of in, or the help of the app when in has no command. The
-// help lists the commands of the app, or the positional arguments and the options of the command.
-// It lists the global options with the flags of the help among them.
-func (a *App[G]) helpOf(d *declaration[G], in *input[G]) *Help {
-	h := &Help{App: a.name}
-	if in.cmd == nil {
-		h.Usage = []string{"[global options]", "<command>", "[options]"}
-		h.Text = a.help
-		h.Commands = make([]HelpCommand, len(d.commands))
-		for i, c := range d.commands {
-			h.Commands[i] = HelpCommand{Name: c.cmd.name, Text: c.cmd.help}
+// helpOf returns the help of the last command of the path of in, which is the app before a command.
+// The help lists the subcommands, the positional arguments and the options of the command, and the
+// options of its ancestors as the global options. The flags of the help are options of the app.
+func (a *App[G]) helpOf(in *input[G]) *Help {
+	b := in.cmd
+	h := &Help{App: a.name, Command: b.path, Text: b.help, Usage: []string{usageOptions}}
+	if len(b.children) > 0 {
+		name := usageCommand
+		if b.handle != nil {
+			name = "[" + usageCommand + "]"
 		}
-	} else {
-		h.Command = in.cmd.cmd.name
-		h.Usage = []string{"[options]"}
-		h.Text = in.cmd.cmd.help
-		for _, o := range ordered(in.cmd.options) {
-			if o.arg {
-				h.Usage = append(h.Usage, o.usage())
-				h.Arguments = append(h.Arguments, o.helpOption())
-			} else {
-				h.Options = append(h.Options, o.helpOption())
-			}
-		}
+		h.Usage = []string{name, usageOptions}
+	}
+	for _, c := range b.children {
+		h.Commands = append(h.Commands, HelpCommand{Name: c.name, Text: c.help})
 	}
 	help := &option{value: reflect.New(reflect.TypeFor[bool]()).Elem(), name: helpName, help: helpText, short: helpRune}
-	for _, o := range ordered(slices.Concat(d.globals, []*option{help})) {
+	own, inherited := b.options, b.inherited
+	if b.parent == nil {
+		own = slices.Concat(own, []*option{help})
+	} else {
+		inherited = slices.Concat(inherited, []*option{help})
+	}
+	for _, o := range ordered(own) {
+		if o.arg {
+			h.Usage = append(h.Usage, o.usage())
+			h.Arguments = append(h.Arguments, o.helpOption())
+		} else {
+			h.Options = append(h.Options, o.helpOption())
+		}
+	}
+	for _, o := range ordered(inherited) {
 		h.Globals = append(h.Globals, o.helpOption())
 	}
 	return h

@@ -135,6 +135,41 @@ func TestScan(t *testing.T) {
 			})
 		}
 
+		paths := []struct {
+			name     string
+			giveArgs []string
+		}{
+			{
+				name:     "reads a flag of a command before the name of its subcommand",
+				giveArgs: []string{parent, "--dsn", "pg", subcommand},
+			},
+			{
+				name:     "reads a flag of a command after the name of its subcommand",
+				giveArgs: []string{parent, subcommand, "--dsn", "pg"},
+			},
+			{
+				name:     "reads a short flag of a command in a cluster after the name of its subcommand",
+				giveArgs: []string{parent, subcommand, "-vd", "pg"},
+			},
+		}
+		for _, tt := range paths {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+				app, _, migrate := nesting[scanGlobal, Store, stepsOptions](t)
+				res := execute(t, app, tt.giveArgs, nil, nil)
+				assert.NoError(t, res.err, "Execute runs the subcommand")
+				assert.Equal(t, migrate.Config().DSN, "pg", "the subcommand reads the option of its command")
+			})
+		}
+
+		t.Run("reads a global flag between the names of a path", func(t *testing.T) {
+			t.Parallel()
+			app, _, migrate := nesting[scanGlobal, Store, stepsOptions](t)
+			res := execute(t, app, []string{parent, "-v", subcommand}, nil, nil)
+			assert.NoError(t, res.err, "Execute runs the subcommand")
+			assert.True(t, migrate.Global().Verbose, "the run sets the global option")
+		})
+
 		t.Run("reads h in a cluster as the flag of the help", func(t *testing.T) {
 			t.Parallel()
 			app, _ := serving[scanGlobal, scanOptions](t)
@@ -211,6 +246,35 @@ func TestScan(t *testing.T) {
 				res := execute(t, app, tt.giveArgs, nil, nil)
 				assert.ErrorIs(t, res.err, tt.wantErr, "Execute returns the error of the command line")
 				assert.Equal(t, res.err.Error(), tt.want, "the error states the flag")
+			})
+		}
+
+		nested := []struct {
+			name     string
+			giveArgs []string
+			wantErr  error
+			want     string
+		}{
+			{
+				name:     "returns ErrUnknownFlag for a flag of a subcommand before the name of the subcommand",
+				giveArgs: []string{parent, "--steps", "3", subcommand},
+				wantErr:  cli.ErrUnknownFlag,
+				want:     "cli: db: unknown flag --steps",
+			},
+			{
+				name:     "returns ErrUnknownCommand for an unknown subcommand",
+				giveArgs: []string{parent, "migrat"},
+				wantErr:  cli.ErrUnknownCommand,
+				want:     `cli: db: unknown command "migrat" (did you mean migrate?)`,
+			},
+		}
+		for _, tt := range nested {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+				app, _, _ := nesting[scanGlobal, Store, stepsOptions](t)
+				res := execute(t, app, tt.giveArgs, nil, nil)
+				assert.ErrorIs(t, res.err, tt.wantErr, "Execute returns the error of the command line")
+				assert.Equal(t, res.err.Error(), tt.want, "the error states the path and the input")
 			})
 		}
 

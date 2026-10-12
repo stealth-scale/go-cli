@@ -114,6 +114,20 @@ func TestDebug(t *testing.T) {
 			assert.HasPrefix(t, res.stderr, "  OPTION", "the run writes the table")
 		})
 
+		t.Run("lists the options of the ancestors of a subcommand before its own options", func(t *testing.T) {
+			t.Parallel()
+			r := &recorder{}
+			app, _, _ := nesting[commandGlobal, Store, stepsOptions](t)
+			app.Render(r)
+			res := execute(t, app, []string{parent, subcommand, "--flag-debug", "--steps", "3"}, nil, nil)
+			assert.NoError(t, res.err, "Execute runs the subcommand")
+			assert.Equal(t, r.rows, []cli.DebugRow{
+				{Option: "--dsn", Value: `""`},
+				{Option: "--verbose", Value: "false"},
+				{Option: "--steps", Value: "3", Source: cli.Source{Kind: cli.Flag, Name: "--steps"}},
+			}, "the rows list the options of the ancestors and then the options of the subcommand")
+		})
+
 		t.Run("returns the error of Stderr when the table fails to write", func(t *testing.T) {
 			t.Parallel()
 			var stdout bytes.Buffer
