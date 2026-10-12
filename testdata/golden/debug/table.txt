@@ -1,0 +1,16 @@
+  OPTION      VALUE                        SOURCE
+  --config    "srv.json"                   flag --config
+  --verbose   false                        default
+  --addr      ":8080"                      default
+  --allow     [10.0.0.0/8 192.168.0.0/16]  flag --allow
+  --labels    map["env":1]                 key serve.labels of srv.json
+  --limit     8                            flag --limit
+  --mark      [m]                          flag --mark
+  --password  ***                          flag --password
+  --port      81                           env SRV_SERVE_PORT
+  --since     2026-10-12T09:30:00Z         flag --since
+  --tags      ["a b" "c"]                  flag --tags
+  --timeout   5s                           key serve.timeout of srv.json
+  --workers   <nil>                        default
+  TARGET      "v2"                         argument TARGET
+handler

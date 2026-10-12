@@ -1,0 +1,26 @@
+Usage: srv serve [options] SOURCE [TARGET] [FILES...]
+
+Run the server.
+
+Arguments:
+      SOURCE  Source of the data.
+      TARGET  Target of the data.  default "."
+      FILES   Files to copy.       default ""
+
+Options:
+      --label string=int,...  Labels of the server.   env SRV_SERVE_LABEL, key serve.label
+  -m, --mode dev|prod         Run mode.               default "dev", env SRV_SERVE_MODE, key serve.mode
+      --password string       Password of the store.  default "***", env SRV_SERVE_PASSWORD, key serve.password
+      --quiet                 Log less.               env SRV_SERVE_QUIET, key serve.quiet
+      --region string         Region of the server.   required, env SRV_SERVE_REGION, key serve.region
+      --secret string
+  -t, --tags string,...       Tags to attach.         env SRV_SERVE_TAGS, key serve.tags
+      --timeout duration      Request timeout.        default "30s", env SRV_SERVE_TIMEOUT, key serve.timeout
+      --tls-cert string       Certificate file.       env SRV_SERVE_TLS_CERT, key serve.tls.cert
+      --workers int           Number of workers.      env SRV_SERVE_WORKERS, key serve.workers
+
+Global options:
+  -c, --config file  Config file in JSON or INI.                                             env SRV_CONFIG
+      --flag-debug   Print the value and the source of each option before the command runs.  env SRV_FLAG_DEBUG
+  -h, --help         Show the help.
+  -v, --verbose      Log more.                                                               env SRV_VERBOSE, key verbose
