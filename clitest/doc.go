@@ -5,7 +5,7 @@
 //
 // [Main] runs a program once and returns its exit status and its output. [Transcript] runs a
 // program once for each [Input] of a list and returns the runs as a terminal shows them, with the
-// config files that each run read. [NewEnv] returns the [cli.Env] of an Input for a test that calls
+// files that each run opened. [NewEnv] returns the [cli.Env] of an Input for a test that calls
 // App.Execute, or a handler through cli.NewRun:
 //
 //	res := clitest.Main(t.Context(), app().Main, &clitest.Input{
@@ -18,11 +18,11 @@
 //
 // # Isolation
 //
-// A run reads only the arguments, the environment variables, the config files and the standard
-// input of its Input. A read of a config file outside [Input.Files] returns an error that wraps
-// fs.ErrNotExist, so a run skips the config file at the default path of the program. A test that
-// needs files on disk passes os.DirFS as Input.Files. The package leaves the state of the process
-// unchanged, so tests that call it can run in parallel.
+// A run reads only the arguments, the environment variables, the files and the standard input of
+// its Input. An open of a file outside [Input.Files] returns an error that wraps fs.ErrNotExist,
+// so a run skips the config file at the default path of the program. A test that needs files on
+// disk passes os.DirFS as Input.Files. The package leaves the state of the process unchanged, so
+// tests that call it can run in parallel.
 //
 // # Transcripts
 //

@@ -97,6 +97,11 @@ func TestTranscript(t *testing.T) {
 				want: "$ cat say.json\n$ say --config say.json echo\nsay: echo: config file say.json: cli: decode JSON: EOF\n[exit 2]\n",
 			},
 			{
+				name: "writes each input file that a run opens before its command line",
+				give: []clitest.Input{{Args: []string{"upper", "in.txt"}, Files: clitest.Files{"in.txt": "hello\n"}}},
+				want: "$ cat in.txt\nhello\n$ say upper in.txt\nHELLO\n[exit 0]\n",
+			},
+			{
 				name: "writes the lines of the comment of a run above the run",
 				give: []clitest.Input{{Comment: "The first line.\n\nThe third line.", Args: []string{"echo"}}},
 				want: "# The first line.\n#\n# The third line.\n$ say echo\n[exit 0]\n",
@@ -110,11 +115,15 @@ func TestTranscript(t *testing.T) {
 			})
 		}
 
-		t.Run("writes each config file that a run read once in the order of the first reads", func(t *testing.T) {
+		t.Run("writes each file that a run opens once in the order of the first opens", func(t *testing.T) {
 			t.Parallel()
 			program := func(_ context.Context, env *cli.Env) int {
 				for _, name := range []string{"b.json", "a.json", "b.json"} {
-					if _, err := env.ReadFile(name); err != nil {
+					f, err := env.Open(name)
+					if err != nil {
+						return cli.ExitFailure
+					}
+					if err := f.Close(); err != nil {
 						return cli.ExitFailure
 					}
 				}

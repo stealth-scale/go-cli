@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"testing/fstest"
 
 	"go.stealthscale.io/cli"
 )
@@ -27,7 +28,7 @@ var (
 // Input is the input of one run of a program.
 type Input struct {
 	Vars       map[string]string // the environment variables of Env.Lookup and Env.Environ
-	Files      fs.FS             // the file system of the config files, or nil for a run without files
+	Files      fs.FS             // the file system of the config files and the input files, or nil
 	Comment    string            // the comment above the run in a transcript, or empty
 	Stdin      string            // the standard input
 	Args       []string          // the arguments after the name of the program
@@ -36,14 +37,14 @@ type Input struct {
 }
 
 // Output is what the runs of an Env write. It keeps the standard output, the standard error, and
-// both streams in the order of the writes. It also records the config files that the runs read.
+// both streams in the order of the writes. It also records the files that the runs open.
 //
 // # Concurrency
 //
 // The methods of an Output and the writers of its Env are safe for concurrent use, as the methods
 // of os.File are.
 type Output struct {
-	files  []file // the config files that the runs read, in the order of the first reads
+	files  []file // the files that the runs open, in the order of the first opens
 	stdout bytes.Buffer
 	stderr bytes.Buffer
 	both   bytes.Buffer // both streams in the order of the writes
@@ -64,7 +65,7 @@ func (o *Output) Stderr() string {
 	return o.stderr.String()
 }
 
-// read records the config file name with the content data, unless the runs read the file before.
+// read records the file name with the content data, unless the runs opened the file before.
 func (o *Output) read(name string, data []byte) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -73,16 +74,16 @@ func (o *Output) read(name string, data []byte) {
 	}
 }
 
-// snapshot returns the config files that the runs read and the text of both streams.
+// snapshot returns the files that the runs opened and the text of both streams.
 func (o *Output) snapshot() ([]file, string) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	return slices.Clone(o.files), o.both.String()
 }
 
-// file is a config file that a run read.
+// file is a file that a run opened.
 type file struct {
-	name string // the path of the read
+	name string // the path of the open
 	data []byte // the content of the file
 }
 
@@ -121,11 +122,12 @@ func (full) Write([]byte) (int, error) {
 
 // NewEnv returns an Env of in, and the Output that the runs of the Env write.
 //
-// A run of the Env reads only the config files of in.Files. It reads the file at the path of the
-// read after filepath.ToSlash and path.Clean, and without the leading slash, so /etc/srv.json is the
-// file etc/srv.json of in.Files. A read of a path outside in.Files, and every read without
-// in.Files, returns an error that wraps fs.ErrNotExist. The error of a read is an *fs.PathError with
-// the path of the read.
+// A run of the Env opens only the files of in.Files, its config file and its input files alike. It
+// opens the file at the path of the open after filepath.ToSlash and path.Clean, and without the
+// leading slash, so /etc/srv.json is the file etc/srv.json of in.Files. An open of a path outside
+// in.Files, and every open without in.Files, returns an error that wraps fs.ErrNotExist. The error
+// of an open is an *fs.PathError with the path of the open. The Output records the content of each
+// file that a run opens, and the opened file reads that content.
 func NewEnv(in *Input) (*cli.Env, *Output) {
 	out := new(Output)
 	files := in.Files
@@ -135,16 +137,17 @@ func NewEnv(in *Input) (*cli.Env, *Output) {
 	env := &cli.Env{
 		Lookup:  cli.Vars(in.Vars),
 		Environ: cli.Environ(in.Vars),
-		ReadFile: func(name string) ([]byte, error) {
-			data, err := fs.ReadFile(files, strings.TrimPrefix(path.Clean(filepath.ToSlash(name)), "/"))
+		Open: func(name string) (fs.File, error) {
+			clean := strings.TrimPrefix(path.Clean(filepath.ToSlash(name)), "/")
+			data, err := fs.ReadFile(files, clean)
 			if err != nil {
 				if e, ok := errors.AsType[*fs.PathError](err); ok {
 					err = e.Err
 				}
-				return nil, &fs.PathError{Op: "read", Path: name, Err: err}
+				return nil, &fs.PathError{Op: "open", Path: name, Err: err}
 			}
 			out.read(name, data)
-			return data, nil
+			return fstest.MapFS{clean: {Data: data}}.Open(clean)
 		},
 		Stdin:  strings.NewReader(in.Stdin),
 		Stdout: stream{out: out, buf: &out.stdout},

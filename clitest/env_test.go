@@ -87,44 +87,47 @@ func TestEnv(t *testing.T) {
 			assert.Empty(t, out.Stdout(), "Stdout returns nothing")
 		})
 
-		reads := []struct {
+		opens := []struct {
 			name      string
 			giveFiles fs.FS
 			givePath  string
 			want      string
 		}{
 			{
-				name:      "reads a config file of Files",
+				name:      "opens a file of Files",
 				giveFiles: clitest.Files{"srv.json": `{"port": 8}`},
 				givePath:  "srv.json",
 				want:      `{"port": 8}`,
 			},
 			{
-				name:      "reads a config file of an absolute path at the root of Files",
+				name:      "opens the file of an absolute path at the root of Files",
 				giveFiles: clitest.Files{"etc/srv.json": `{"port": 8}`},
 				givePath:  "/etc/srv.json",
 				want:      `{"port": 8}`,
 			},
 			{
-				name:      "reads a config file at the path that path.Clean returns for the path of the read",
+				name:      "opens the file at the path that path.Clean returns for the path of the open",
 				giveFiles: clitest.Files{"srv.json": `{"port": 8}`},
 				givePath:  "./conf/../srv.json",
 				want:      `{"port": 8}`,
 			},
 			{
-				name:      "reads a config file of a file system of another type",
+				name:      "opens a file of a file system of another type",
 				giveFiles: fstest.MapFS{"srv.json": {Data: []byte(`{"port": 8}`)}},
 				givePath:  "srv.json",
 				want:      `{"port": 8}`,
 			},
 		}
-		for _, tt := range reads {
+		for _, tt := range opens {
 			t.Run(tt.name, func(t *testing.T) {
 				t.Parallel()
 				env, _ := clitest.NewEnv(&clitest.Input{Files: tt.giveFiles})
-				got, err := env.ReadFile(tt.givePath)
-				assert.NoError(t, err, "ReadFile reads the file")
-				assert.Equal(t, string(got), tt.want, "ReadFile returns the text of the file")
+				f, err := env.Open(tt.givePath)
+				assert.NoError(t, err, "Open opens the file")
+				got, err := io.ReadAll(f)
+				assert.NoError(t, err, "the file reads")
+				assert.NoError(t, f.Close(), "the file closes")
+				assert.Equal(t, string(got), tt.want, "the file has the text of Files")
 			})
 		}
 
@@ -138,27 +141,27 @@ func TestEnv(t *testing.T) {
 				name:      "returns an error that wraps fs.ErrNotExist for a path outside Files",
 				giveFiles: clitest.Files{"srv.yaml": "port: 8"},
 				wantErr:   fs.ErrNotExist,
-				want:      "read /etc/srv.json: file does not exist",
+				want:      "open /etc/srv.json: file does not exist",
 			},
 			{
 				name:    "returns an error that wraps fs.ErrNotExist for every path without Files",
 				wantErr: fs.ErrNotExist,
-				want:    "read /etc/srv.json: file does not exist",
+				want:    "open /etc/srv.json: file does not exist",
 			},
 			{
 				name:      "returns an error that wraps an error of Files that is not an *fs.PathError",
 				giveFiles: brokenFS{},
 				wantErr:   errDisk,
-				want:      "read /etc/srv.json: disk gone",
+				want:      "open /etc/srv.json: disk gone",
 			},
 		}
 		for _, tt := range failures {
 			t.Run(tt.name, func(t *testing.T) {
 				t.Parallel()
 				env, _ := clitest.NewEnv(&clitest.Input{Files: tt.giveFiles})
-				_, err := env.ReadFile("/etc/srv.json")
-				assert.ErrorIs(t, err, tt.wantErr, "ReadFile returns the error of the read")
-				assert.Equal(t, err.Error(), tt.want, "the error names the path of the read")
+				_, err := env.Open("/etc/srv.json")
+				assert.ErrorIs(t, err, tt.wantErr, "Open returns the error of the file system")
+				assert.Equal(t, err.Error(), tt.want, "the error states the path of the open")
 			})
 		}
 	})

@@ -31,6 +31,10 @@ type (
 		Extra []string
 		Fail  bool
 	}
+	// upperOptions contains the options of the command upper.
+	upperOptions struct {
+		File cli.InputFile `arg:"" default:"-"`
+	}
 )
 
 // brokenFS is a file system whose every open fails with errDisk, an error that is not an
@@ -42,9 +46,9 @@ func (brokenFS) Open(string) (fs.File, error) {
 	return nil, errDisk
 }
 
-// say returns the program say with the command echo. echo writes its standard input to the standard
-// error. It then writes each word of its arguments and of the option extra to a line of the
-// standard output in upper case.
+// say returns the program say with the commands echo and upper. echo writes its standard input to
+// the standard error. It then writes each word of its arguments and of the option extra to a line
+// of the standard output in upper case. upper writes its input file in upper case.
 func say() func(context.Context, *cli.Env) int {
 	app := cli.New[sayGlobal](program, "")
 	app.Command("echo", "", func(_ context.Context, run *cli.Run[sayGlobal, sayOptions]) error {
@@ -61,6 +65,19 @@ func say() func(context.Context, *cli.Env) int {
 			}
 		}
 		return nil
+	})
+	app.Command("upper", "", func(_ context.Context, run *cli.Run[sayGlobal, upperOptions]) error {
+		f, err := run.Open(run.Config().File)
+		if err != nil {
+			return err
+		}
+		data, err := io.ReadAll(f)
+		err = errors.Join(err, f.Close())
+		if err != nil {
+			return err
+		}
+		_, err = io.WriteString(run.Stdout(), strings.ToUpper(string(data)))
+		return err
 	})
 	return app.Main
 }
