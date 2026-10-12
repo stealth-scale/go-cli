@@ -54,4 +54,26 @@ func TestError(t *testing.T) {
 			assert.Equal(t, errors.Unwrap(e), cli.ErrUnknownFlag, "Unwrap returns the sentinel", assert.ByIdentity())
 		})
 	})
+
+	t.Run("Message", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("returns the command before the message without the package name", func(t *testing.T) {
+			t.Parallel()
+			app, _ := serving[struct{}, errorOptions](t)
+			res := execute(t, app, []string{command, "--adr", ":80"}, nil, nil)
+			e := assert.ErrorAs[*cli.Error](t, res.err, "Execute returns an *Error for an unknown flag")
+			assert.Equal(t, e.Message(), "serve: unknown flag --adr (did you mean --addr?)",
+				"Message returns the command before the message")
+		})
+
+		t.Run("returns the message alone for an input before the command", func(t *testing.T) {
+			t.Parallel()
+			app, _ := serving[struct{}, errorOptions](t)
+			res := execute(t, app, []string{"serv"}, nil, nil)
+			e := assert.ErrorAs[*cli.Error](t, res.err, "Execute returns an *Error for an unknown command")
+			assert.Equal(t, e.Message(), `unknown command "serv" (did you mean serve?)`,
+				"Message returns the message without a prefix")
+		})
+	})
 }

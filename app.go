@@ -127,8 +127,8 @@ func (a *App[G]) Execute(ctx context.Context, env *Env) error {
 }
 
 // Main runs [App.Execute] and returns the exit status for os.Exit. It writes the message of an
-// error to env.Stderr after the name of the app. The message of an [*Error] leaves out the package
-// name, such as "srv: serve: unknown flag --adr (did you mean --addr?)". The status is [ExitUsage]
+// error to env.Stderr after the name of the app. For an [*Error] it writes [Error.Message], such as
+// "srv: serve: unknown flag --adr (did you mean --addr?)". The status is [ExitUsage]
 // for an error that wraps an *Error, [ExitFailure] for any other error, and [ExitOK] without one.
 // Main does not write the message to a nil Env or to an Env without Stderr.
 func (a *App[G]) Main(ctx context.Context, env *Env) int {
@@ -140,7 +140,7 @@ func (a *App[G]) Main(ctx context.Context, env *Env) int {
 	if e, ok := errors.AsType[*Error](err); ok {
 		status = ExitUsage
 		if e.Error() == msg {
-			msg = e.message()
+			msg = e.Message()
 		}
 	}
 	if env != nil && env.Stderr != nil {

@@ -7,9 +7,9 @@
 //
 // The function run calls App.Execute and inspects its error:
 //   - A *cli.Error reports an invalid command line, environment variable or config file. run tests
-//     the error against each sentinel with errors.Is and selects a hint. The hint of an invalid value
-//     contains the input, the value and the source of the value. The program exits with
-//     cli.ExitUsage.
+//     the error against each sentinel with errors.Is and selects a hint. It writes Error.Message and
+//     the hint. The hint of an invalid value contains the input, the value and the source of the
+//     value. The program exits with cli.ExitUsage.
 //   - Any other error comes from a handler. The program exits with cli.ExitFailure.
 package main
 
@@ -80,7 +80,7 @@ func run(ctx context.Context, env *cli.Env) int {
 		hint = "lint --help lists the options"
 	}
 	// The exit status reports the error when the write of the message fails.
-	_, _ = fmt.Fprintf(env.Stderr, "lint: %v\nhint: %s\n", e, hint)
+	_, _ = fmt.Fprintf(env.Stderr, "lint: %s\nhint: %s\n", e.Message(), hint)
 	return cli.ExitUsage
 }
 

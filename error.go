@@ -51,10 +51,10 @@ type Error struct {
 	Source  Source // the source of Value, or the zero Source
 }
 
-// Error returns the message of e after the package name and the command, such as
+// Error returns [Error.Message] after the package name, such as
 // "cli: serve: unknown flag --adr (did you mean --addr?)".
 func (e *Error) Error() string {
-	return prefix + e.message()
+	return prefix + e.Message()
 }
 
 // Unwrap returns the sentinel of e.
@@ -62,8 +62,10 @@ func (e *Error) Unwrap() error {
 	return e.Err
 }
 
-// message returns the message of e after the command, without the package name.
-func (e *Error) message() string {
+// Message returns the message of e after its command, such as
+// "serve: unknown flag --adr (did you mean --addr?)". The message does not contain the package
+// name. [App.Main] writes it after the name of the app.
+func (e *Error) Message() string {
 	if e.Command == "" {
 		return e.text
 	}
