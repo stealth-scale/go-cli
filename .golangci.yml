@@ -273,6 +273,7 @@ linters:
         - (fs|filepath)\.WalkDir\(
         - filepath\.Walk\(
         - \(go\.stealthscale\.io/cli\.Plain\)\.
+        - \.Open\(name string\) \(io/fs\.File, error\)$
       ignore-interface-regexps:
         - ^cli\.Renderer$
   exclusions:

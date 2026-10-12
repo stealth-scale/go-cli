@@ -77,12 +77,14 @@ linters:
             - go.stealthscale.io/cli
     # The package cli returns the error of a Renderer unchanged, as it returns the error of a
     # handler unchanged. The renderer Plain wraps the errors of its writer itself, so a renderer
-    # that delegates to Plain returns those errors unchanged too.
+    # that delegates to Plain returns those errors unchanged too. A file system that delegates to
+    # another fs.FS returns its *fs.PathError unchanged, as the contract of fs.FS requires.
     wrapcheck:
       ignore-interface-regexps:
         - ^cli\.Renderer$
       ignore-sig-regexps:
         - \(go\.stealthscale\.io/cli\.Plain\)\.
+        - \.Open\(name string\) \(io/fs\.File, error\)$
 
 formatters:
   settings:
