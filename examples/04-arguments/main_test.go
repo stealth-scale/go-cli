@@ -11,6 +11,14 @@ import (
 	"go.stealthscale.io/cli/clitest"
 )
 
+// files are the input files of the runs of add.
+var files = clitest.Files{
+	"app.log":  "GET /\nGET /health\n",
+	"db.log":   "SELECT 1\n",
+	"-odd.log": "odd\n",
+	"--level":  "level\n",
+}
+
 // runs are the command lines of the transcript of the example.
 var runs = []clitest.Input{
 	{Args: []string{"create", "--help"}},
@@ -19,10 +27,11 @@ var runs = []clitest.Input{
 	{Args: []string{"create", "logs", "rotated daily"}},
 	{Args: []string{"create"}},
 	{Args: []string{"create", "logs", "daily", "extra"}},
-	{Args: []string{"add", "logs", "app.log", "-l", "9", "db.log"}},
+	{Args: []string{"add", "logs", "app.log", "-l", "9", "db.log"}, Files: files},
 	{Args: []string{"add", "logs"}},
-	{Args: []string{"add", "logs", "--", "-odd.log", "--level"}},
-	{Args: []string{"add", "logs", "-"}},
+	{Args: []string{"add", "logs", "--", "-odd.log", "--level"}, Files: files},
+	{Stdin: "GET /\n", Args: []string{"add", "logs", "-"}},
+	{Args: []string{"add", "logs", "missing.log"}, Files: files},
 	{Args: []string{"list"}},
 	{Args: []string{"list", "*.log", "app-*"}},
 	{Args: []string{"create", "logs"}, FailStdout: true},

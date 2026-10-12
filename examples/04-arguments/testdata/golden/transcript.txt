@@ -45,23 +45,36 @@ $ pack create logs daily extra
 pack: create: unexpected argument "extra"
 [exit 2]
 
+$ cat app.log
+GET /
+GET /health
+$ cat db.log
+SELECT 1
 $ pack add logs app.log -l 9 db.log
-add "app.log" to "logs" at level 9
-add "db.log" to "logs" at level 9
+add "app.log" of 18 bytes to "logs" at level 9
+add "db.log" of 9 bytes to "logs" at level 9
 [exit 0]
 
 $ pack add logs
 pack: add: missing argument FILES
 [exit 2]
 
+$ cat -odd.log
+odd
+$ cat --level
+level
 $ pack add logs -- -odd.log --level
-add "-odd.log" to "logs" at level 6
-add "--level" to "logs" at level 6
+add "-odd.log" of 4 bytes to "logs" at level 6
+add "--level" of 6 bytes to "logs" at level 6
 [exit 0]
 
-$ pack add logs -
-add "-" to "logs" at level 6
+$ printf 'GET /\n' | pack add logs -
+add "-" of 6 bytes to "logs" at level 6
 [exit 0]
+
+$ pack add logs missing.log
+pack: main: add: open missing.log: file does not exist
+[exit 1]
 
 $ pack list
 list every file

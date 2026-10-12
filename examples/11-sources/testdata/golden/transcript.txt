@@ -108,6 +108,39 @@ $ cat fetch.json
     "token": "from-the-file"
   }
 }
+$ fetch get --token s3cret
+fetch: other users of the machine can read the flag --token. Set FETCH_GET_TOKEN instead.
+url      https://example.com  default
+agent    fetch/1.0            default
+token    set                  flag --token
+timeout  20s                  key get.timeout of fetch.json
+retries  5                    key get.retries of fetch.json
+[exit 0]
+
+$ cat fetch.json
+{
+  "get": {
+    "retries": 5,
+    "timeout": "20s",
+    "token": "from-the-file"
+  }
+}
+$ FETCH_GET_TOKEN=s3cret fetch get
+url      https://example.com  default
+agent    fetch/1.0            default
+token    set                  env FETCH_GET_TOKEN
+timeout  20s                  key get.timeout of fetch.json
+retries  5                    key get.retries of fetch.json
+[exit 0]
+
+$ cat fetch.json
+{
+  "get": {
+    "retries": 5,
+    "timeout": "20s",
+    "token": "from-the-file"
+  }
+}
 $ fetch get >/dev/full
 fetch: main: write the options: clitest: no space left on device
 [exit 1]

@@ -22,6 +22,7 @@ var runs = []clitest.Input{
 	{Args: []string{"run", "--max-issues", "many", "src"}},
 	{Vars: map[string]string{"LINT_RUN_FORMAT": "xml"}, Args: []string{"run", "src"}},
 	{Args: []string{"-c", "lint.json", "run", "src"}, Files: os.DirFS(".")},
+	{Args: []string{"-c", "missing.json", "run", "src"}},
 	{Args: []string{"run", "src"}, FailStdout: true},
 }
 

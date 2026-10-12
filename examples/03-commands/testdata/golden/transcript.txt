@@ -20,11 +20,13 @@ plan: 2 changes
 [exit 0]
 
 $ deploy -v apply -e prod -y
+deploy: run apply
 apply: target prod in eu-west-1
 apply: 2 changes applied
 [exit 0]
 
 $ deploy apply -e prod -y --verbose
+deploy: run apply
 apply: target prod in eu-west-1
 apply: 2 changes applied
 [exit 0]
@@ -76,6 +78,7 @@ registry: 4 images in registry.example.com
 [exit 0]
 
 $ deploy -v registry push app:v2
+deploy: run registry push
 registry: sign in as deploy@registry.example.com
 push: app:v2 as deploy@registry.example.com
 registry: sign out

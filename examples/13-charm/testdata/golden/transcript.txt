@@ -100,6 +100,10 @@ $ SRV_SERVE_TOKEN=s3cret srv serve store-2 --flag-debug
 serve store-2 on :8080
 [exit 0]
 
+$ CLICOLOR_FORCE=1 SRV_SERVE_TOKEN=s3cret srv serve
+serve [1mmain[m on :8080
+[exit 0]
+
 $ srv migrate -n
 plan: no migration
 [exit 0]

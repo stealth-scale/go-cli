@@ -19,6 +19,7 @@ var runs = []clitest.Input{
 	{Args: []string{"serve", "--adr", ":9000"}},
 	{Args: []string{"serve"}},
 	{Vars: map[string]string{"SRV_SERVE_TOKEN": "s3cret"}, Args: []string{"serve", "store-2", "--flag-debug"}},
+	{Vars: map[string]string{"CLICOLOR_FORCE": "1", "SRV_SERVE_TOKEN": "s3cret"}, Args: []string{"serve"}},
 	{Args: []string{"migrate", "-n"}},
 	{Args: []string{"migrate"}, FailStdout: true},
 }

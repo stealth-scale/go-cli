@@ -1,4 +1,4 @@
-# Without an option, wc writes every number.
+# Without a file or a flag, wc writes every number of its standard input.
 $ printf 'one two\nthree four\nfive\n' | wc
 3 5 24
 [exit 0]
@@ -18,6 +18,27 @@ $ wc --lines
 0
 [exit 0]
 
+# wc counts the files of its arguments together.
+$ cat a.txt
+one two
+$ cat b.txt
+three
+$ wc a.txt b.txt
+2 3 14
+[exit 0]
+
+# The path - is the standard input.
+$ cat a.txt
+one two
+$ printf 'one two\nthree four\nfive\n' | wc a.txt -
+4 7 32
+[exit 0]
+
+# A missing file fails with the exit status 1.
+$ wc missing.txt
+wc: main: count: open missing.txt: file does not exist
+[exit 1]
+
 # An unknown flag fails with the exit status 2.
 $ printf 'one two\nthree four\nfive\n' | wc --chars
 wc: unknown flag --chars
@@ -30,5 +51,5 @@ wc: main: write the numbers: clitest: no space left on device
 
 # A failed read fails with the exit status 1.
 $ wc <&-
-wc: main: read the standard input: clitest: bad file descriptor
+wc: main: read "-": clitest: bad file descriptor
 [exit 1]

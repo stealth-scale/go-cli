@@ -15,6 +15,9 @@
 // registry. Their flags --url and --user come before or after the name of the subcommand, and
 // their names are DEPLOY_REGISTRY_URL and registry.url. The hook signIn opens a session before
 // each handler of registry runs, and the subcommands read the session through the pointer.
+//
+// The hook trace of the app runs before every handler. With the flag --verbose it writes the path
+// of the command of the run to the standard error.
 package main
 
 import (
@@ -86,6 +89,7 @@ func main() {
 // subcommands push and prune of registry.
 func app() *cli.App[Global] {
 	a := cli.New[Global]("deploy", "Deploy the service.")
+	a.Use(trace)
 	a.Command("plan", "Print the changes of a deployment.", plan)
 	a.Command("apply", "Apply the changes of a deployment.", apply)
 	a.Command("rollback", "Roll back to an earlier release.", rollback)
@@ -94,6 +98,17 @@ func app() *cli.App[Global] {
 	registry.Command("push", "Push an image to the registry.", push)
 	registry.Command("prune", "Remove the oldest images of the registry.", prune)
 	return a
+}
+
+// trace writes the path of the command of the run to the standard error for the flag --verbose,
+// and then runs the hooks below it and the handler.
+func trace(ctx context.Context, run *cli.Run[Global, Global], next func(context.Context) error) error {
+	if run.Global().Verbose {
+		if _, err := fmt.Fprintf(run.Stderr(), "deploy: run %s\n", run.Command()); err != nil {
+			return fmt.Errorf("main: write the trace: %w", err)
+		}
+	}
+	return next(ctx)
 }
 
 // plan writes the changes that a deployment to the target would make.

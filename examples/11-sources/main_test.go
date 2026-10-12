@@ -23,6 +23,8 @@ var runs = []clitest.Input{
 	{Vars: map[string]string{"FETCH_CONFIG": ""}, Args: []string{"get"}, Files: files},
 	{Args: []string{"get", "--flag-debug", "--agent", "curl/8.10"}, Files: files},
 	{Vars: map[string]string{"FETCH_FLAG_DEBUG": "true"}, Args: []string{"get", "--retries", "0"}, Files: files},
+	{Args: []string{"get", "--token", "s3cret"}, Files: files},
+	{Vars: map[string]string{"FETCH_GET_TOKEN": "s3cret"}, Args: []string{"get"}, Files: files},
 	{Args: []string{"get"}, Files: files, FailStdout: true},
 }
 

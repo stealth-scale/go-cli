@@ -4,7 +4,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"strings"
 	"testing"
 
 	"go.dokimi.dev/assert"
@@ -17,12 +19,18 @@ import (
 // input is the standard input of the tests: three lines of five words.
 const input = "one two\nthree four\nfive\n"
 
+// files are the input files of the tests.
+var files = clitest.Files{"a.txt": "one two\n", "b.txt": "three\n"}
+
 // runs are the command lines of the transcript of the example.
 var runs = []clitest.Input{
-	{Comment: "Without an option, wc writes every number.", Stdin: input},
+	{Comment: "Without a file or a flag, wc writes every number of its standard input.", Stdin: input},
 	{Comment: "The flag --words selects the number of words.", Stdin: input, Args: []string{"--words"}},
 	{Comment: "Short flags combine in one argument.", Stdin: input, Args: []string{"-lc"}},
 	{Comment: "An empty standard input has no lines.", Args: []string{"--lines"}},
+	{Comment: "wc counts the files of its arguments together.", Args: []string{"a.txt", "b.txt"}, Files: files},
+	{Comment: "The path - is the standard input.", Stdin: input, Args: []string{"a.txt", "-"}, Files: files},
+	{Comment: "A missing file fails with the exit status 1.", Args: []string{"missing.txt"}, Files: files},
 	{Comment: "An unknown flag fails with the exit status 2.", Stdin: input, Args: []string{"--chars"}},
 	{Comment: "A failed write fails with the exit status 1.", Stdin: input, FailStdout: true},
 	{Comment: "A failed read fails with the exit status 1.", FailStdin: true},
@@ -38,8 +46,8 @@ func newRun(t *testing.T, config *Count, in *clitest.Input) (*cli.Run[Count, Cou
 	return run, out
 }
 
-// TestTesting checks the transcript of the runs, one run and the error of an unknown flag through
-// clitest. It also tests the handler count on its own.
+// TestTesting checks the transcript of the runs, one run, an Env that a test builds and the error
+// of an unknown flag. It also tests the handler count on its own.
 func TestTesting(t *testing.T) {
 	t.Parallel()
 
@@ -59,6 +67,21 @@ func TestTesting(t *testing.T) {
 			assert.Equal(t, res.Stdout, "5\n", "the run writes the number of words")
 		})
 
+		t.Run("reads the variables of an Env that a test builds", func(t *testing.T) {
+			t.Parallel()
+			vars := map[string]string{"WC_WORDS": "true"}
+			var out bytes.Buffer
+			env := &cli.Env{
+				Lookup:  cli.Vars(vars),
+				Environ: cli.Environ(vars),
+				Stdin:   strings.NewReader(input),
+				Stdout:  &out,
+				Stderr:  &out,
+			}
+			assert.NoError(t, app().Execute(t.Context(), env), "Execute runs the handler of the app")
+			assert.Equal(t, out.String(), "5\n", "the variable WC_WORDS selects the number of words")
+		})
+
 		t.Run("returns an *Error for an unknown flag", func(t *testing.T) {
 			t.Parallel()
 			env, out := clitest.NewEnv(&clitest.Input{Args: []string{"--chars"}})
@@ -75,22 +98,37 @@ func TestTesting(t *testing.T) {
 
 		t.Run("writes the number of words of the standard input", func(t *testing.T) {
 			t.Parallel()
-			run, out := newRun(t, &Count{Words: true}, &clitest.Input{Stdin: input})
+			run, out := newRun(t, &Count{Files: []cli.InputFile{"-"}, Words: true}, &clitest.Input{Stdin: input})
 			assert.NoError(t, count(t.Context(), run), "count reads the standard input")
 			assert.Equal(t, out.Stdout(), "5\n", "count writes the number of words")
 		})
 
+		t.Run("writes the number of lines of the files of Files", func(t *testing.T) {
+			t.Parallel()
+			run, out := newRun(t, &Count{Files: []cli.InputFile{"a.txt", "b.txt"}, Lines: true}, &clitest.Input{
+				Files: files,
+			})
+			assert.NoError(t, count(t.Context(), run), "count reads the files")
+			assert.Equal(t, out.Stdout(), "2\n", "count writes the number of lines of both files")
+		})
+
 		t.Run("returns the error of a context that ended", func(t *testing.T) {
 			t.Parallel()
-			run, _ := newRun(t, &Count{}, &clitest.Input{Stdin: input})
+			run, _ := newRun(t, &Count{Files: []cli.InputFile{"-"}}, &clitest.Input{Stdin: input})
 			assert.HonoursCancellation(t, func(ctx context.Context) error { return count(ctx, run) },
 				"count stops when its context ends")
 		})
 
 		t.Run("returns the error of a standard input that fails", func(t *testing.T) {
 			t.Parallel()
-			run, _ := newRun(t, &Count{}, &clitest.Input{FailStdin: true})
+			run, _ := newRun(t, &Count{Files: []cli.InputFile{"-"}}, &clitest.Input{FailStdin: true})
 			assert.ErrorIs(t, count(t.Context(), run), clitest.ErrStdin, "count returns the error of the read")
+		})
+
+		t.Run("returns the error of a standard output that fails", func(t *testing.T) {
+			t.Parallel()
+			run, _ := newRun(t, &Count{Files: []cli.InputFile{"-"}}, &clitest.Input{Stdin: input, FailStdout: true})
+			assert.ErrorIs(t, count(t.Context(), run), clitest.ErrStdout, "count returns the error of the write")
 		})
 	})
 }

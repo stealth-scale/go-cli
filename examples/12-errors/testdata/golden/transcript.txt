@@ -38,7 +38,12 @@ $ cat lint.json
 }
 $ lint -c lint.json run src
 lint: run: unknown key run.max-issue in lint.json (did you mean run.max-issues?)
-hint: lint --help lists the options
+hint: lint run --help lists the keys that lint.json can contain
+[exit 2]
+
+$ lint -c missing.json run src
+lint: run: config file missing.json: open missing.json: file does not exist
+hint: the flag -c selects another config file, or -c '' runs without one
 [exit 2]
 
 $ lint run src >/dev/full

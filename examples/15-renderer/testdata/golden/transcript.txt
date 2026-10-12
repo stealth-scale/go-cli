@@ -1,0 +1,116 @@
+$ stock count bolts
+bolts: 12 in main
+[exit 0]
+
+$ stock count --help
+Usage: stock count [options] ITEM
+
+Count an item in a warehouse.
+
+Arguments:
+      ITEM  Item to count.
+
+Options:
+  -w, --warehouse string  Warehouse of the item.  default "main", env STOCK_COUNT_WAREHOUSE, key count.warehouse
+
+Global options:
+      --flag-debug  Print the value and the source of each option before the command runs.  env STOCK_FLAG_DEBUG
+  -h, --help        Show the help.
+[exit 0]
+
+$ OUTPUT=json stock count --help
+{
+  "App": "stock",
+  "Command": "count",
+  "Text": "Count an item in a warehouse.",
+  "Usage": [
+    "[options]",
+    "ITEM"
+  ],
+  "Commands": null,
+  "Arguments": [
+    {
+      "Name": "ITEM",
+      "Short": "",
+      "Placeholder": "",
+      "Text": "Item to count.",
+      "Default": "",
+      "Env": "",
+      "Key": "",
+      "Required": false
+    }
+  ],
+  "Options": [
+    {
+      "Name": "--warehouse",
+      "Short": "-w",
+      "Placeholder": "string",
+      "Text": "Warehouse of the item.",
+      "Default": "\"main\"",
+      "Env": "STOCK_COUNT_WAREHOUSE",
+      "Key": "count.warehouse",
+      "Required": false
+    }
+  ],
+  "Globals": [
+    {
+      "Name": "--flag-debug",
+      "Short": "",
+      "Placeholder": "",
+      "Text": "Print the value and the source of each option before the command runs.",
+      "Default": "",
+      "Env": "STOCK_FLAG_DEBUG",
+      "Key": "",
+      "Required": false
+    },
+    {
+      "Name": "--help",
+      "Short": "-h",
+      "Placeholder": "",
+      "Text": "Show the help.",
+      "Default": "",
+      "Env": "",
+      "Key": "",
+      "Required": false
+    }
+  ]
+}
+[exit 0]
+
+$ stock count
+stock: count: missing argument ITEM
+[exit 2]
+
+$ OUTPUT=json stock count
+{
+  "app": "stock",
+  "command": "count",
+  "message": "missing argument ITEM",
+  "usage": true
+}
+[exit 2]
+
+$ OUTPUT=json stock cuont bolts
+{
+  "app": "stock",
+  "message": "unknown command \"cuont\"",
+  "suggestion": "count",
+  "usage": true
+}
+[exit 2]
+
+$ OUTPUT=json stock count bolts -w east --flag-debug
+[
+  {
+    "option": "--warehouse",
+    "value": "\"east\"",
+    "source": "flag --warehouse"
+  },
+  {
+    "option": "ITEM",
+    "value": "\"bolts\"",
+    "source": "argument ITEM"
+  }
+]
+bolts: 12 in east
+[exit 0]

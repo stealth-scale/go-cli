@@ -11,7 +11,9 @@
 //   - the environment variable
 //   - the flag
 //
-// A later source replaces the value of an earlier one. Run.Source returns the source of an option.
+// A later source replaces the value of an earlier one. Run.Source returns the source of an option,
+// and Source.Kind is the kind of that source. The handler warns about a token from a flag, because
+// other users of the machine can read the arguments of a process.
 //
 // With the global flag --flag-debug or the variable FETCH_FLAG_DEBUG, a run writes the value and the
 // source of every option to the standard error before the handler runs. It masks the value of a
@@ -21,6 +23,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"time"
@@ -54,9 +57,16 @@ func app() *cli.App[Global] {
 }
 
 // get writes each option of the request with its source. It writes whether the token is set and
-// does not write the token.
+// does not write the token. For a token from a flag it first writes a warning to the standard
+// error.
 func get(_ context.Context, run *cli.Run[Global, Get]) error {
 	g := run.Config()
+	if src, _ := run.Source(&g.Token); src.Kind == cli.Flag {
+		const warning = "fetch: other users of the machine can read the flag --token. Set FETCH_GET_TOKEN instead.\n"
+		if _, err := io.WriteString(run.Stderr(), warning); err != nil {
+			return fmt.Errorf("main: write the warning: %w", err)
+		}
+	}
 	token := "unset"
 	if g.Token != "" {
 		token = "set"

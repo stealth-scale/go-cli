@@ -9,7 +9,10 @@
 //   - A *cli.Error reports an invalid command line, environment variable or config file. run tests
 //     the error against each sentinel with errors.Is and selects a hint. It writes Error.Message and
 //     the hint. The hint of an invalid value contains the input, the value and the source of the
-//     value. The program exits with cli.ExitUsage.
+//     value. The hint of an unknown key contains the config file. The program exits with
+//     cli.ExitUsage.
+//   - An error that wraps cli.ErrDeclaration reports a defect of the program, such as a wrong tag.
+//     The program exits with cli.ExitFailure.
 //   - Any other error comes from a handler. The program exits with cli.ExitFailure.
 package main
 
@@ -62,8 +65,12 @@ func run(ctx context.Context, env *cli.Env) int {
 	}
 	e, ok := errors.AsType[*cli.Error](err)
 	if !ok {
+		prefix := "lint: "
+		if errors.Is(err, cli.ErrDeclaration) {
+			prefix = "lint: a defect of the program: "
+		}
 		// The exit status reports the error when the write of the message fails.
-		_, _ = fmt.Fprintf(env.Stderr, "lint: %v\n", err)
+		_, _ = fmt.Fprintf(env.Stderr, "%s%v\n", prefix, err)
 		return cli.ExitFailure
 	}
 	var hint string
@@ -72,6 +79,10 @@ func run(ctx context.Context, env *cli.Env) int {
 		hint = "lint --help lists the commands"
 	case errors.Is(e, cli.ErrUnknownFlag):
 		hint = "lint " + e.Command + " --help lists the flags of the command"
+	case errors.Is(e, cli.ErrUnknownKey):
+		hint = "lint " + e.Command + " --help lists the keys that " + e.Source.File + " can contain"
+	case errors.Is(e, cli.ErrConfigFile):
+		hint = "the flag -c selects another config file, or -c '' runs without one"
 	case errors.Is(e, cli.ErrMissing):
 		hint = "the command needs " + e.Input
 	case errors.Is(e, cli.ErrInvalidValue):

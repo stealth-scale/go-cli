@@ -15,11 +15,18 @@
 //
 // Flags can come between the arguments. Every argument after the argument -- is positional. A lone -
 // is an argument too.
+//
+// The files of add are input files. The handler opens each with Run.Open, which returns the standard
+// input for the path -:
+//
+//	printf 'GET /\n' | go run ./04-arguments add logs -
 package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"go.stealthscale.io/cli"
@@ -33,9 +40,9 @@ type Create struct {
 
 // Add contains the options of the command add.
 type Add struct {
-	Archive string   `help:"Archive that receives the files."           arg:""`
-	Files   []string `help:"Files to add, or - for the standard input." arg:""`
-	Level   int      `help:"Level of the compression."                         default:"6" short:"l"`
+	Archive string          `help:"Archive that receives the files."           arg:""`
+	Files   []cli.InputFile `help:"Files to add, or - for the standard input." arg:""`
+	Level   int             `help:"Level of the compression."                         default:"6" short:"l"`
 }
 
 // List contains the options of the command list.
@@ -62,14 +69,32 @@ func create(_ context.Context, run *cli.Run[struct{}, Create]) error {
 	return write(run, fmt.Appendf(nil, "create %q with the comment %q\n", c.Name, c.Comment))
 }
 
-// add writes a line for each file.
+// add writes a line with the number of bytes of each file. It opens one file at a time.
 func add(_ context.Context, run *cli.Run[struct{}, Add]) error {
 	a := run.Config()
 	var out []byte
-	for _, f := range a.Files {
-		out = fmt.Appendf(out, "add %q to %q at level %d\n", f, a.Archive, a.Level)
+	for _, name := range a.Files {
+		n, err := size(run, name)
+		if err != nil {
+			return err
+		}
+		out = fmt.Appendf(out, "add %q of %d bytes to %q at level %d\n", name, n, a.Archive, a.Level)
 	}
 	return write(run, out)
+}
+
+// size returns the number of bytes of the input file name of run, and closes the file.
+func size(run *cli.Run[struct{}, Add], name cli.InputFile) (n int64, err error) {
+	f, err := run.Open(name)
+	if err != nil {
+		return 0, fmt.Errorf("main: add: %w", err)
+	}
+	defer func() { err = errors.Join(err, f.Close()) }()
+	n, err = io.Copy(io.Discard, f)
+	if err != nil {
+		return 0, fmt.Errorf("main: read %s: %w", name, err)
+	}
+	return n, nil
 }
 
 // list writes the patterns. It writes "list every file" when the command line does not have a
