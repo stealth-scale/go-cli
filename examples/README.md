@@ -5,31 +5,34 @@
 
 # examples/
 
-Each example is a runnable program in the directory `examples/<module>/<name>`. `<module>` is the
-module of this repository that the example uses: `cli`, `yaml`, `toml` or `charm`. The module
+Each example is a runnable program in a directory of its own. The numbers of the directories follow
+the order of the sections of the [README](../README.md) of the repository. The module
 `go.stealthscale.io/cli/examples` contains every example. It is not released.
 
 | Example | Shows |
 |---|---|
-| [`cli/quickstart`](cli/quickstart) | the smallest program: a global option, a command with an optional argument and two flags, the help, and the exit status of an error |
-| [`cli/commands`](cli/commands) | three commands that share embedded options, global flags before and after the command, a required enum, the error of a handler, and the suggestion for a command |
-| [`cli/tags`](cli/tags) | every tag of an option: `help`, `default`, `enum`, `required`, `name`, `short`, `env`, `key` and `secret` |
-| [`cli/types`](cli/types) | an option of each type that the package converts without a registration, and the error of each conversion |
-| [`cli/conversions`](cli/conversions) | types of the program: a `flag.Value`, an `encoding.TextUnmarshaler`, the registrations of `App.Convert`, and a registration that replaces a built-in conversion |
-| [`cli/groups`](cli/groups) | groups of options: nested structs, embedded structs, and the tag `prefix` |
-| [`cli/arguments`](cli/arguments) | positional arguments: a required argument, an optional one and a list, the argument `--`, and a lone `-` |
-| [`cli/sources`](cli/sources) | the order of the sources of an option, `Run.Source`, the flag `--flag-debug`, and an empty path of the config file |
-| [`cli/config`](cli/config) | config files in JSON and INI, a format for another extension, a key that two commands share, and an unknown key |
-| [`cli/errors`](cli/errors) | a program that inspects the error of `App.Execute` in place of `App.Main` |
-| [`cli/testing`](cli/testing) | the tests of a program: runs with an `Env`, a handler through `NewRun`, the standard input, and a context that has ended |
-| [`yaml/config`](yaml/config) | a YAML config file through `yaml.Register`, with a map whose keys are integers |
-| [`toml/config`](toml/config) | a TOML config file through `toml.Register`, with a date |
-| [`charm/help`](charm/help) | the help, the failures and the table of `--flag-debug` through `charm.Register`, and a help at the width in `COLUMNS` |
+| [`01-quickstart`](01-quickstart) | the smallest program: a global option, a command with an optional argument and two flags, the help, and the exit status of an error |
+| [`02-tags`](02-tags) | every tag of an option: `help`, `default`, `enum`, `required`, `name`, `short`, `env`, `key` and `secret` |
+| [`03-commands`](03-commands) | three commands that share embedded options, global flags before and after the command, a required enum, the error of a handler, and the suggestion for a command |
+| [`04-arguments`](04-arguments) | positional arguments: a required argument, an optional one and a list, the argument `--`, and a lone `-` |
+| [`05-groups`](05-groups) | groups of options: nested structs, embedded structs, and the tag `prefix` |
+| [`06-types`](06-types) | an option of each type that the package converts without a registration, and the error of each conversion |
+| [`07-conversions`](07-conversions) | types of the program: a `flag.Value`, an `encoding.TextUnmarshaler`, the registrations of `App.Convert`, and a registration that replaces a built-in conversion |
+| [`08-config`](08-config) | config files in JSON and INI, a format for another extension, a key that two commands share, and an unknown key |
+| [`09-yaml`](09-yaml) | a YAML config file through `yaml.Register`, with a map whose keys are integers |
+| [`10-toml`](10-toml) | a TOML config file through `toml.Register`, with a date |
+| [`11-sources`](11-sources) | the order of the sources of an option, `Run.Source`, the flag `--flag-debug`, and an empty path of the config file |
+| [`12-errors`](12-errors) | a program that inspects the error of `App.Execute` in place of `App.Main` |
+| [`13-charm`](13-charm) | the help, the failures and the table of `--flag-debug` through `charm.Register`, and a help at the width in `COLUMNS` |
+| [`14-testing`](14-testing) | the tests of a program: runs with an `Env`, a handler through `NewRun`, the standard input, and a context that has ended |
+
+Each example imports the module `go.stealthscale.io/cli`. The examples `09-yaml`, `10-toml` and
+`13-charm` also import the module of their name.
 
 Run an example from the directory `examples/`:
 
 ```sh
-go run ./cli/quickstart hello Ada --times 2
+go run ./01-quickstart hello Ada --times 2
 ```
 
 The test of each example runs the command lines of its transcript. It compares the output of the
@@ -37,5 +40,8 @@ runs with `testdata/golden/transcript.txt`, so the golden file shows what the ex
 command writes the transcripts again after a change:
 
 ```sh
-go test ./cli/... ./yaml/... ./toml/... ./charm/... -update
+go test ./0... ./1... -update
 ```
+
+The patterns `./0...` and `./1...` match the numbered directories and leave out
+`internal/transcript`, because the test of the harness does not define the flag `-update`.

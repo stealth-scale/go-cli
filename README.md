@@ -366,7 +366,7 @@ environment variable or config file. The error wraps one of the sentinels `ErrUn
 `ErrUnknownFlag`, `ErrUnknownKey`, `ErrMissing`, `ErrInvalidValue`, `ErrUnexpectedArgument` and
 `ErrConfigFile`. Its fields `Command`, `Input`, `Value` and `Source` contain the location of the
 fault. `Error.Message` returns the text that `App.Main` writes after the name of the app. The
-example [`examples/cli/errors`](examples/cli/errors) handles these errors in place of `App.Main`.
+example [`examples/12-errors`](examples/12-errors) handles these errors in place of `App.Main`.
 
 `App.Execute` checks the options of every command before it reads the command line. A wrong tag of
 one command fails a run of any command with an error that wraps `ErrDeclaration`, so the first test
@@ -489,7 +489,8 @@ parallel tests can share one app.
 
 ## Examples
 
-[`examples/`](examples) contains 14 runnable programs. The test of each example compares its output
+[`examples/`](examples) contains 14 runnable programs. Their numbers follow the order of the sections
+of this README, from `01-quickstart` to `14-testing`. The test of each example compares its output
 with a golden transcript. [examples/README.md](examples/README.md) lists what each example shows.
 
 ## Development
