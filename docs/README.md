@@ -13,6 +13,7 @@ Where each kind of document is kept, and which one to write.
 | `roadmap/` | What we build in what order, and what has to be true first | Work needs sequencing rather than justifying |
 | `rfc/` | Proposals and the argument behind them | A change alters a contract, or several approaches are worth comparing |
 | `adr/` | Decisions already made, and what they cost | One decision is settled and no credible alternative is still open |
+| `research/` | Answers to questions about systems outside this repository, with their sources | A decision depends on what other projects do or measure |
 
 Milestone numbers are in `roadmap/` and nowhere else.
 
