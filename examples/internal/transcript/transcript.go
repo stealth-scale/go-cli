@@ -52,9 +52,10 @@ func (full) Write([]byte) (int, error) {
 // and its standard error follows. The last line contains the exit status in brackets. A blank line
 // separates two runs.
 //
-// The environment variables of a run come before name in the order of their names. The command line
-// of a run with a standard input pipes the output of printf to the program. The command line of a run
-// with Full ends with a redirect to /dev/full. Every write of such a run to its standard output fails.
+// The environment variables of a run come before name in the order of their names. The program
+// receives them through the Lookup and the Environ of its Env. The command line of a run with a
+// standard input pipes the output of printf to the program. The command line of a run with Full
+// ends with a redirect to /dev/full. Every write of such a run to its standard output fails.
 //
 // Each run reads its config files with os.ReadFile. The path of a config file is relative to the
 // working directory.
@@ -83,6 +84,7 @@ func Write(ctx context.Context, name string, runs []Run, program func(context.Co
 		b.WriteString("$ " + line + "\n")
 		env := &cli.Env{
 			Lookup:   cli.Vars(r.Vars),
+			Environ:  cli.Environ(r.Vars),
 			ReadFile: os.ReadFile,
 			Stdin:    strings.NewReader(r.Stdin),
 			Stdout:   stdout,

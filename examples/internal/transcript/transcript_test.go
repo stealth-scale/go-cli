@@ -112,6 +112,18 @@ func TestTranscript(t *testing.T) {
 			})
 		}
 
+		t.Run("passes the environment variables of a run to Environ", func(t *testing.T) {
+			t.Parallel()
+			environ := func(_ context.Context, env *cli.Env) int {
+				_, err := io.WriteString(env.Stdout, strings.Join(env.Environ(), " ")+"\n")
+				assert.NoError(t, err, "the program writes its environment")
+				return 0
+			}
+			runs := []transcript.Run{{Vars: map[string]string{"B": "2", "A": "1"}}}
+			got := transcript.Write(t.Context(), program, runs, environ)
+			assert.Equal(t, string(got), "$ A=1 B=2 say\nA=1 B=2\n[exit 0]\n", "the program receives the variables")
+		})
+
 		t.Run("reads a config file with os.ReadFile", func(t *testing.T) {
 			t.Parallel()
 			path := filepath.Join(t.TempDir(), "say.json")

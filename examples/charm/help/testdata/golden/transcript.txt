@@ -1,0 +1,109 @@
+$ srv --help
+Serve the store.
+
+USAGE
+  srv [global options] <command> [options]
+
+COMMANDS
+  serve              Run the server of the store.
+  migrate            Migrate the store to the current schema.
+
+GLOBAL OPTIONS
+  -c, --config file  Config file in JSON.
+                     env SRV_CONFIG
+      --flag-debug   Print the value and the source of each option before the
+                     command runs.
+                     env SRV_FLAG_DEBUG
+  -h, --help         Show the help.
+[exit 0]
+
+$ srv serve --help
+Run the server of the store.
+
+USAGE
+  srv serve [options] [STORE]
+
+ARGUMENTS
+  STORE               Name of the store.
+                      default "main"
+
+OPTIONS
+  -a, --addr string   Address to listen on.
+                      default ":8080" · env SRV_SERVE_ADDR · key serve.addr
+      --client-certificate-authority string
+                      Certificate authority of the clients.
+                      env SRV_SERVE_CLIENT_CERTIFICATE_AUTHORITY
+                      key serve.client-certificate-authority
+  -q, --quiet         Do not log the requests.
+                      env SRV_SERVE_QUIET · key serve.quiet
+      --token string  Bearer token of the requests.
+                      required · env SRV_SERVE_TOKEN · key serve.token
+
+GLOBAL OPTIONS
+  -c, --config file   Config file in JSON.
+                      env SRV_CONFIG
+      --flag-debug    Print the value and the source of each option before the
+                      command runs.
+                      env SRV_FLAG_DEBUG
+  -h, --help          Show the help.
+[exit 0]
+
+$ COLUMNS=60 srv serve --help
+Run the server of the store.
+
+USAGE
+  srv serve [options] [STORE]
+
+ARGUMENTS
+  STORE               Name of the store.
+                      default "main"
+
+OPTIONS
+  -a, --addr string   Address to listen on.
+                      default ":8080" · env SRV_SERVE_ADDR
+                      key serve.addr
+      --client-certificate-authority string
+                      Certificate authority of the clients.
+                      env SRV_SERVE_CLIENT_CERTIFICATE_AUTHORITY
+                      key serve.client-certificate-authority
+  -q, --quiet         Do not log the requests.
+                      env SRV_SERVE_QUIET · key serve.quiet
+      --token string  Bearer token of the requests.
+                      required · env SRV_SERVE_TOKEN
+                      key serve.token
+
+GLOBAL OPTIONS
+  -c, --config file   Config file in JSON.
+                      env SRV_CONFIG
+      --flag-debug    Print the value and the source of each
+                      option before the command runs.
+                      env SRV_FLAG_DEBUG
+  -h, --help          Show the help.
+[exit 0]
+
+$ srv serve --adr :9000
+srv: serve: unknown flag --adr (did you mean --addr?)
+[exit 2]
+
+$ srv serve
+srv: serve: missing --token
+[exit 2]
+
+$ SRV_SERVE_TOKEN=s3cret srv serve store-2 --flag-debug
+  OPTION                          VALUE      SOURCE
+  --config                        ""         default
+  --addr                          ":8080"    default
+  --client-certificate-authority  ""         default
+  --quiet                         false      default
+  --token                         ***        env SRV_SERVE_TOKEN
+  STORE                           "store-2"  argument STORE
+serve store-2 on :8080
+[exit 0]
+
+$ srv migrate -n
+plan: no migration
+[exit 0]
+
+$ srv migrate >/dev/full
+srv: main: write the result: transcript: no space left on device
+[exit 1]

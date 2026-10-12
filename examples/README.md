@@ -6,7 +6,7 @@
 # examples/
 
 Each example is a runnable program in the directory `examples/<module>/<name>`. `<module>` is the
-module of this repository that the example uses: `cli`, `yaml` or `toml`. The module
+module of this repository that the example uses: `cli`, `yaml`, `toml` or `charm`. The module
 `go.stealthscale.io/cli/examples` contains every example. It is not released.
 
 | Example | Shows |
@@ -24,6 +24,7 @@ module of this repository that the example uses: `cli`, `yaml` or `toml`. The mo
 | [`cli/testing`](cli/testing) | the tests of a program: runs with an `Env`, a handler through `NewRun`, the standard input, and a context that has ended |
 | [`yaml/config`](yaml/config) | a YAML config file through `yaml.Register`, with a map whose keys are integers |
 | [`toml/config`](toml/config) | a TOML config file through `toml.Register`, with a date |
+| [`charm/help`](charm/help) | the help, the failures and the table of `--flag-debug` through `charm.Register`, and a help at the width in `COLUMNS` |
 
 Run an example from the directory `examples/`:
 
@@ -36,5 +37,5 @@ runs with `testdata/golden/transcript.txt`, so the golden file shows what the ex
 command writes the transcripts again after a change:
 
 ```sh
-go test ./cli/... ./yaml/... ./toml/... -update
+go test ./cli/... ./yaml/... ./toml/... ./charm/... -update
 ```
