@@ -109,6 +109,13 @@
 // outside the standard library. The file nests the keys of each command and of each group in
 // objects. A run fails for a key of the file without an option in the app.
 //
+// # Input files
+//
+// An option of the type [InputFile] is the path of an input file, and the path - is the standard
+// input. [Run.Open] opens the file through [Env.Open], or returns the standard input for -. The
+// package does not open an input file while it reads the command line, so the handler opens and
+// closes the files of a list one at a time.
+//
 // # Command line
 //
 // The command line follows these rules of GNU:
@@ -146,7 +153,8 @@
 //
 // An [Env] contains the arguments, the environment variables, the files and the standard streams
 // of a run, so a test runs a program without the state of its process. [Vars] returns the
-// environment variables of a map, and [Environ] lists the variables of the same map. [NewRun]
+// environment variables of a map, and [Environ] lists the variables of the same map. [Env.Open]
+// has the signature of fs.FS.Open, so a test assigns the Open method of a file system. [NewRun]
 // returns the [Run] of a handler for a test that calls the handler without [App.Execute]. The
 // package go.stealthscale.io/cli/clitest builds the Env of a test, runs a program with it, and
 // writes the transcript of a list of runs for a golden file.

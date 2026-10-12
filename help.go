@@ -116,11 +116,12 @@ func (o *option) placeholder() string {
 	}
 }
 
-// typeName returns the name of the type t in the help: file for a ConfigFile, the name of the
-// element for a pointer, the name of a named type in lower case, and else the name of its kind.
+// typeName returns the name of the type t in the help: file for a ConfigFile and an InputFile, the
+// name of the element for a pointer, the name of a named type in lower case, and else the name of
+// its kind.
 func typeName(t reflect.Type) string {
 	switch {
-	case t == configFileType:
+	case t == configFileType || t == inputFileType:
 		return "file"
 	case t.Kind() == reflect.Pointer:
 		return typeName(t.Elem())

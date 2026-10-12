@@ -84,10 +84,10 @@ func TestYAML(t *testing.T) {
 				var out bytes.Buffer
 				files := fstest.MapFS{path: {Data: []byte("serve:\n  addr: ':80'\n  labels: {1: web}\n")}}
 				env := &cli.Env{
-					ReadFile: files.ReadFile,
-					Stdout:   &out,
-					Stderr:   &out,
-					Args:     []string{"--config", path, "serve"},
+					Open:   files.Open,
+					Stdout: &out,
+					Stderr: &out,
+					Args:   []string{"--config", path, "serve"},
 				}
 				assert.NoError(t, app.Execute(t.Context(), env), "Execute reads the YAML file")
 				assert.Equal(

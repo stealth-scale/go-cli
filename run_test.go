@@ -7,13 +7,27 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"io/fs"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"go.dokimi.dev/assert"
 
 	"go.stealthscale.io/cli"
 )
+
+// closingReader is a standard input that records a call of its Close.
+type closingReader struct {
+	io.Reader
+	closed bool
+}
+
+// Close records the call and returns nil.
+func (c *closingReader) Close() error {
+	c.closed = true
+	return nil
+}
 
 // runGlobal and runOptions are the options of the app in the tests of Run.
 type (
@@ -249,6 +263,87 @@ func TestRun(t *testing.T) {
 			run, err := cli.NewRun(&runGlobal{}, &runOptions{}, &cli.Env{Stdout: out, Stderr: out})
 			assert.NoError(t, err, "NewRun returns a run")
 			assert.Empty(t, run.Command(), "Command returns the empty string")
+		})
+	})
+
+	t.Run("Open", func(t *testing.T) {
+		t.Parallel()
+
+		inputs := []struct {
+			name      string
+			giveStdin io.Reader
+			want      string
+		}{
+			{
+				name:      "returns the standard input of the run for the path -",
+				giveStdin: strings.NewReader("piped"),
+				want:      "piped",
+			},
+			{
+				name: "returns an empty standard input for the path - of an Env without Stdin",
+				want: "",
+			},
+		}
+		for _, tt := range inputs {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+				out := &bytes.Buffer{}
+				run, err := cli.NewRun(
+					&runGlobal{},
+					&runOptions{},
+					&cli.Env{Stdin: tt.giveStdin, Stdout: out, Stderr: out},
+				)
+				assert.NoError(t, err, "NewRun returns a run")
+				f, err := run.Open("-")
+				assert.NoError(t, err, "Open opens the standard input")
+				data, err := io.ReadAll(f)
+				assert.NoError(t, err, "the standard input reads")
+				assert.Equal(t, string(data), tt.want, "Open returns the standard input of the run")
+			})
+		}
+
+		t.Run("returns a standard input whose Close leaves the Stdin of the Env open", func(t *testing.T) {
+			t.Parallel()
+			in, out := &closingReader{Reader: strings.NewReader("")}, &bytes.Buffer{}
+			run, err := cli.NewRun(&runGlobal{}, &runOptions{}, &cli.Env{Stdin: in, Stdout: out, Stderr: out})
+			assert.NoError(t, err, "NewRun returns a run")
+			f, err := run.Open("-")
+			assert.NoError(t, err, "Open opens the standard input")
+			assert.NoError(t, f.Close(), "Close returns nil")
+			assert.False(t, in.closed, "Close leaves the Stdin of the Env open")
+		})
+
+		t.Run("returns the file that Env.Open opens for any other path", func(t *testing.T) {
+			t.Parallel()
+			out := &bytes.Buffer{}
+			files := fstest.MapFS{"in.json": {Data: []byte("{}")}}
+			run, err := cli.NewRun(&runGlobal{}, &runOptions{}, &cli.Env{Open: files.Open, Stdout: out, Stderr: out})
+			assert.NoError(t, err, "NewRun returns a run")
+			f, err := run.Open("in.json")
+			assert.NoError(t, err, "Open opens the file")
+			data, err := io.ReadAll(f)
+			assert.NoError(t, err, "the file reads")
+			assert.Equal(t, string(data), "{}", "Open returns the file of Env.Open")
+		})
+
+		t.Run("returns the error of Env.Open unchanged", func(t *testing.T) {
+			t.Parallel()
+			out := &bytes.Buffer{}
+			open := func(string) (fs.File, error) { return nil, errIO }
+			run, err := cli.NewRun(&runGlobal{}, &runOptions{}, &cli.Env{Open: open, Stdout: out, Stderr: out})
+			assert.NoError(t, err, "NewRun returns a run")
+			_, err = run.Open("in.json")
+			assert.Equal(t, err, errIO, "Open returns the error of Env.Open", assert.ByIdentity())
+		})
+
+		t.Run("returns an error that wraps fs.ErrNotExist for an Env without Open", func(t *testing.T) {
+			t.Parallel()
+			out := &bytes.Buffer{}
+			run, err := cli.NewRun(&runGlobal{}, &runOptions{}, &cli.Env{Stdout: out, Stderr: out})
+			assert.NoError(t, err, "NewRun returns a run")
+			_, err = run.Open("in.json")
+			assert.ErrorIs(t, err, fs.ErrNotExist, "the error wraps fs.ErrNotExist")
+			assert.Equal(t, err.Error(), "open in.json: file does not exist", "the error states the path")
 		})
 	})
 }

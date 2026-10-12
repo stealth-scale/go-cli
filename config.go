@@ -7,6 +7,7 @@ import (
 	"encoding"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"maps"
 	"path/filepath"
@@ -90,14 +91,15 @@ func (a *App[G]) applyConfig(env *Env, d *declaration[G], in *input[G]) error {
 			text:  "config file " + path + ": no format for " + strconv.Quote(ext),
 		}
 	}
-	var data []byte
-	err := error(&fs.PathError{Op: "read", Path: path, Err: fs.ErrNotExist})
-	if env.ReadFile != nil {
-		data, err = env.ReadFile(path)
-	}
+	file, err := env.open(path)
 	if errors.Is(err, fs.ErrNotExist) && !explicit {
 		return nil
 	}
+	if err != nil {
+		return &Error{Err: ErrConfigFile, Input: path, text: "config file " + path + ": " + err.Error()}
+	}
+	data, err := io.ReadAll(file)
+	err = errors.Join(err, file.Close())
 	if err != nil {
 		return &Error{Err: ErrConfigFile, Input: path, text: "config file " + path + ": " + err.Error()}
 	}

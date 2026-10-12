@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"io/fs"
 	"testing/fstest"
 
 	"go.dokimi.dev/assert"
@@ -27,8 +28,13 @@ const (
 	subcommandHelp = "Migrate the database to the current schema."
 )
 
-// errWrite is the error of a writer that fails every write.
-var errWrite = errors.New("disk full")
+// The errors of the writers and the files that fail.
+var (
+	// errWrite is the error of a writer that fails every write.
+	errWrite = errors.New("disk full")
+	// errIO is the error of a file that fails to read or to close.
+	errIO = errors.New("input/output error")
+)
 
 // result is the error of one run of an app and what the run wrote.
 type result struct {
@@ -43,6 +49,31 @@ type failingWriter struct{}
 // Write returns errWrite.
 func (failingWriter) Write([]byte) (int, error) {
 	return 0, errWrite
+}
+
+// brokenFile is an fs.File whose Read returns readErr, or io.EOF without readErr, and whose Close
+// returns closeErr.
+type brokenFile struct {
+	readErr  error
+	closeErr error
+}
+
+// Stat returns fs.ErrInvalid, because a brokenFile has no information.
+func (brokenFile) Stat() (fs.FileInfo, error) {
+	return nil, fs.ErrInvalid
+}
+
+// Read returns readErr, or io.EOF without readErr.
+func (f brokenFile) Read([]byte) (int, error) {
+	if f.readErr != nil {
+		return 0, f.readErr
+	}
+	return 0, io.EOF
+}
+
+// Close returns closeErr.
+func (f brokenFile) Close() error {
+	return f.closeErr
 }
 
 // recorder is a Renderer that records what the package passes to it, and returns err. It writes
@@ -78,7 +109,7 @@ func (r *recorder) Debug(_ io.Writer, environ []string, rows []cli.DebugRow) err
 func execute[G any](tb assert.TB, app *cli.App[G], args []string, vars map[string]string, files fstest.MapFS) result {
 	tb.Helper()
 	var stdout, stderr bytes.Buffer
-	env := &cli.Env{Lookup: cli.Vars(vars), ReadFile: files.ReadFile, Stdout: &stdout, Stderr: &stderr, Args: args}
+	env := &cli.Env{Lookup: cli.Vars(vars), Open: files.Open, Stdout: &stdout, Stderr: &stderr, Args: args}
 	err := app.Execute(assert.Context(tb), env)
 	return result{err: err, stdout: stdout.String(), stderr: stderr.String()}
 }

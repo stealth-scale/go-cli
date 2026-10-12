@@ -6,10 +6,13 @@ package cli_test
 import (
 	"bytes"
 	"io"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"go.dokimi.dev/assert"
+	"go.dokimi.dev/assert/files"
 
 	"go.stealthscale.io/cli"
 )
@@ -36,7 +39,25 @@ func TestEnv(t *testing.T) {
 			env := cli.OS()
 			assert.Equal(t, env.Lookup, os.LookupEnv, "OS looks up the variables with os.LookupEnv")
 			assert.Equal(t, env.Environ, os.Environ, "OS lists the variables with os.Environ")
-			assert.Equal(t, env.ReadFile, os.ReadFile, "OS reads the files with os.ReadFile")
+		})
+
+		t.Run("opens a file of the file system of the process", func(t *testing.T) {
+			t.Parallel()
+			dir := files.Workspace(t, files.Tree{"in.json": files.Text("{}")})
+			f, err := cli.OS().Open(filepath.Join(dir, "in.json"))
+			assert.NoError(t, err, "Open opens the file")
+			data, err := io.ReadAll(f)
+			assert.NoError(t, err, "the file reads")
+			assert.NoError(t, f.Close(), "the file closes")
+			assert.Equal(t, string(data), "{}", "Open returns the content of the file")
+		})
+
+		t.Run("returns the *fs.PathError of a missing file", func(t *testing.T) {
+			t.Parallel()
+			path := filepath.Join(t.TempDir(), "missing.json")
+			_, err := cli.OS().Open(path)
+			e := assert.ErrorAs[*fs.PathError](t, err, "Open returns an *fs.PathError")
+			assert.ErrorIs(t, e, fs.ErrNotExist, "the error wraps fs.ErrNotExist")
 		})
 
 		t.Run("returns the standard streams of package os", func(t *testing.T) {

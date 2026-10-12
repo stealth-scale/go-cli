@@ -96,3 +96,18 @@ func (r *Run[G, C]) Source(field any) (Source, bool) {
 func (r *Run[G, C]) Command() string {
 	return r.command
 }
+
+// Open opens the input file f of the run for reading. For the path -, Open returns the standard
+// input of the run, whose Close does nothing. For any other path, Open returns the file that
+// [Env.Open] opens. The caller closes the file. The standard input reads once, so a second open of
+// - in one run reads what the first read left.
+//
+// Error modes:
+//   - the error of Env.Open, unchanged.
+//   - an *fs.PathError that wraps fs.ErrNotExist for an Env without Open.
+func (r *Run[G, C]) Open(f InputFile) (io.ReadCloser, error) {
+	if f == stdinPath {
+		return io.NopCloser(r.Stdin()), nil
+	}
+	return r.env.open(string(f))
+}

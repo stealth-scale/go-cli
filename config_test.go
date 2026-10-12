@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io/fs"
 	"maps"
 	"strconv"
 	"strings"
@@ -32,7 +33,7 @@ const (
 	decodedValue = "decoded"
 )
 
-// errPermission is the error of an Env that may not read a file.
+// errPermission is the error of an Env that may not open a file.
 var errPermission = errors.New("open srv.json: permission denied")
 
 // The options of the app in the tests of config files.
@@ -380,7 +381,7 @@ func TestConfig(t *testing.T) {
 			assert.Equal(t, got.Config().Addr, ":8080", "the option keeps its default")
 		})
 
-		t.Run("skips the default path for an Env without ReadFile", func(t *testing.T) {
+		t.Run("skips the default path for an Env without Open", func(t *testing.T) {
 			t.Parallel()
 			app, got := serving[defaultGlobal, configOptions](t)
 			var out bytes.Buffer
@@ -393,14 +394,14 @@ func TestConfig(t *testing.T) {
 			name     string
 			giveArgs []string
 			giveVars map[string]string
-			giveRead func(string) ([]byte, error)
+			giveOpen func(string) (fs.File, error)
 			wantErr  error
 			want     string
 		}{
 			{
 				name:     "returns ErrConfigFile for a missing file at the path of a flag",
 				giveArgs: []string{"-c", otherPath, command},
-				giveRead: fstest.MapFS{}.ReadFile,
+				giveOpen: fstest.MapFS{}.Open,
 				wantErr:  cli.ErrConfigFile,
 				want:     "cli: serve: config file other.json: open other.json: file does not exist",
 			},
@@ -408,55 +409,69 @@ func TestConfig(t *testing.T) {
 				name:     "returns ErrConfigFile for a missing file at the path of an environment variable",
 				giveArgs: []string{command},
 				giveVars: map[string]string{"SRV_CONFIG": otherPath},
-				giveRead: fstest.MapFS{}.ReadFile,
+				giveOpen: fstest.MapFS{}.Open,
 				wantErr:  cli.ErrConfigFile,
 				want:     "cli: serve: config file other.json: open other.json: file does not exist",
 			},
 			{
-				name:     "returns ErrConfigFile for a path of a flag and an Env without ReadFile",
+				name:     "returns ErrConfigFile for a path of a flag and an Env without Open",
 				giveArgs: []string{"-c", otherPath, command},
 				wantErr:  cli.ErrConfigFile,
-				want:     "cli: serve: config file other.json: read other.json: file does not exist",
+				want:     "cli: serve: config file other.json: open other.json: file does not exist",
 			},
 			{
-				name:     "returns ErrConfigFile for a file that the Env may not read",
+				name:     "returns ErrConfigFile for a file that the Env may not open",
 				giveArgs: []string{"-c", configPath, command},
-				giveRead: func(string) ([]byte, error) { return nil, errPermission },
+				giveOpen: func(string) (fs.File, error) { return nil, errPermission },
 				wantErr:  cli.ErrConfigFile,
 				want:     "cli: serve: config file srv.json: open srv.json: permission denied",
 			},
 			{
+				name:     "returns ErrConfigFile for a file that fails to read",
+				giveArgs: []string{"-c", configPath, command},
+				giveOpen: func(string) (fs.File, error) { return brokenFile{readErr: errIO}, nil },
+				wantErr:  cli.ErrConfigFile,
+				want:     "cli: serve: config file srv.json: input/output error",
+			},
+			{
+				name:     "returns ErrConfigFile for a file that fails to close",
+				giveArgs: []string{"-c", configPath, command},
+				giveOpen: func(string) (fs.File, error) { return brokenFile{closeErr: errIO}, nil },
+				wantErr:  cli.ErrConfigFile,
+				want:     "cli: serve: config file srv.json: input/output error",
+			},
+			{
 				name:     "returns ErrConfigFile for an extension without a format",
 				giveArgs: []string{"-c", unknownPath, command},
-				giveRead: fstest.MapFS{unknownPath: {}}.ReadFile,
+				giveOpen: fstest.MapFS{unknownPath: {}}.Open,
 				wantErr:  cli.ErrConfigFile,
 				want:     `cli: serve: config file srv.unknown: no format for ".unknown"`,
 			},
 			{
 				name:     "returns ErrConfigFile for a file that its format cannot decode",
 				giveArgs: []string{"-c", configPath, command},
-				giveRead: fstest.MapFS{configPath: {Data: []byte(`{"serve": `)}}.ReadFile,
+				giveOpen: fstest.MapFS{configPath: {Data: []byte(`{"serve": `)}}.Open,
 				wantErr:  cli.ErrConfigFile,
 				want:     "cli: serve: config file srv.json: cli: decode JSON: unexpected EOF",
 			},
 			{
 				name:     "returns ErrUnknownKey with the closest key of the app",
 				giveArgs: []string{"-c", configPath, command},
-				giveRead: fstest.MapFS{configPath: {Data: []byte(`{"serve": {"adr": ":80"}}`)}}.ReadFile,
+				giveOpen: fstest.MapFS{configPath: {Data: []byte(`{"serve": {"adr": ":80"}}`)}}.Open,
 				wantErr:  cli.ErrUnknownKey,
 				want:     "cli: serve: unknown key serve.adr in srv.json (did you mean serve.addr?)",
 			},
 			{
 				name:     "returns ErrUnknownKey without a key that is far from every key of the app",
 				giveArgs: []string{"-c", configPath, command},
-				giveRead: fstest.MapFS{configPath: {Data: []byte(`{"serve": {"listen": ":80"}}`)}}.ReadFile,
+				giveOpen: fstest.MapFS{configPath: {Data: []byte(`{"serve": {"listen": ":80"}}`)}}.Open,
 				wantErr:  cli.ErrUnknownKey,
 				want:     "cli: serve: unknown key serve.listen in srv.json",
 			},
 			{
 				name:     "returns ErrInvalidValue for a value that does not convert",
 				giveArgs: []string{"-c", configPath, command},
-				giveRead: fstest.MapFS{configPath: {Data: []byte(`{"serve": {"port": "x"}}`)}}.ReadFile,
+				giveOpen: fstest.MapFS{configPath: {Data: []byte(`{"serve": {"port": "x"}}`)}}.Open,
 				wantErr:  cli.ErrInvalidValue,
 				want:     `cli: serve: invalid --port "x" from key serve.port of srv.json: invalid syntax`,
 			},
@@ -467,11 +482,11 @@ func TestConfig(t *testing.T) {
 				app, _ := serving[configGlobal, configOptions](t)
 				var out bytes.Buffer
 				env := &cli.Env{
-					Lookup:   cli.Vars(tt.giveVars),
-					ReadFile: tt.giveRead,
-					Stdout:   &out,
-					Stderr:   &out,
-					Args:     tt.giveArgs,
+					Lookup: cli.Vars(tt.giveVars),
+					Open:   tt.giveOpen,
+					Stdout: &out,
+					Stderr: &out,
+					Args:   tt.giveArgs,
 				}
 				err := app.Execute(t.Context(), env)
 				assert.ErrorIs(t, err, tt.wantErr, "Execute returns the error of the config file")

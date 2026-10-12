@@ -58,7 +58,7 @@ func executeBody(c *prop.Case) {
 	app.Command(command, commandHelp, func(context.Context, *cli.Run[appGlobal, appOptions]) error { return nil })
 	var out bytes.Buffer
 	files := fstest.MapFS{"srv.json": {Data: []byte(`{"serve": {"port": 7, "tags": ["a"]}}`)}}
-	err := app.Execute(c.Context(), &cli.Env{ReadFile: files.ReadFile, Stdout: &out, Stderr: &out, Args: args})
+	err := app.Execute(c.Context(), &cli.Env{Open: files.Open, Stdout: &out, Stderr: &out, Args: args})
 	if err != nil {
 		_ = assert.ErrorAs[*cli.Error](c, err, "Execute returns an *Error for an invalid command line")
 	}

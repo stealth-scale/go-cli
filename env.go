@@ -6,6 +6,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"maps"
 	"os"
 	"slices"
@@ -15,36 +16,46 @@ import (
 // its standard streams. A program passes [OS], and a test builds one.
 //
 // Stdout and Stderr are required. The package reads the environment variables of its options
-// through Lookup. Environ returns the environment as KEY=value pairs for a [Renderer] and for the
-// libraries that a handler calls. A nil Lookup does not report any environment variable, and
-// without Environ a Renderer and [Run.Environ] receive nil. A nil ReadFile does not read a file, as
-// if no file existed. A nil Stdin reads as empty.
+// through Lookup, and opens the config file and the input files of a run through Open. Environ
+// returns the environment as KEY=value pairs for a [Renderer] and for the libraries that a handler
+// calls. A nil Lookup does not report any environment variable, and without Environ a Renderer and
+// [Run.Environ] receive nil. A nil Open does not open a file, as if no file existed. A nil Stdin
+// reads as empty.
 //
 // # Concurrency
 //
 // A run calls the functions of its Env on the goroutine of [App.Execute]. Runs that share an Env
 // share its functions and its streams.
 type Env struct {
-	Lookup   func(name string) (string, bool)  // reports the value of the environment variable name
-	Environ  func() []string                   // returns the environment as KEY=value pairs
-	ReadFile func(name string) ([]byte, error) // returns the content of the config file name
-	Stdin    io.Reader
-	Stdout   io.Writer
-	Stderr   io.Writer
-	Args     []string // the arguments after the name of the program
+	Lookup  func(name string) (string, bool) // reports the value of the environment variable name
+	Environ func() []string                  // returns the environment as KEY=value pairs
+	// Open opens the file name for reading. It has the signature of fs.FS.Open, so a test assigns the
+	// Open method of a file system.
+	Open   func(name string) (fs.File, error)
+	Stdin  io.Reader
+	Stdout io.Writer
+	Stderr io.Writer
+	Args   []string // the arguments after the name of the program
 }
 
 // OS returns the Env of the current process: the arguments of os.Args after the name of the
-// program, os.LookupEnv, os.Environ, os.ReadFile and the standard streams of package os.
+// program, os.LookupEnv, os.Environ, an Open that calls os.Open, and the standard streams of
+// package os. Its Open returns the *fs.PathError of os.Open unchanged.
 func OS() *Env {
 	return &Env{
-		Lookup:   os.LookupEnv,
-		Environ:  os.Environ,
-		ReadFile: os.ReadFile,
-		Stdin:    os.Stdin,
-		Stdout:   os.Stdout,
-		Stderr:   os.Stderr,
-		Args:     os.Args[min(1, len(os.Args)):],
+		Lookup:  os.LookupEnv,
+		Environ: os.Environ,
+		Open: func(name string) (fs.File, error) {
+			f, err := os.Open(name)
+			if err != nil {
+				return nil, err
+			}
+			return f, nil
+		},
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+		Args:   os.Args[min(1, len(os.Args)):],
 	}
 }
 
@@ -98,4 +109,16 @@ func (e *Env) lookup(name string) (string, bool) {
 		return "", false
 	}
 	return e.Lookup(name)
+}
+
+// open opens the file name through the Open of e.
+//
+// Error modes:
+//   - the error of Open, unchanged.
+//   - an *fs.PathError that wraps fs.ErrNotExist when e has no Open, as if no file existed.
+func (e *Env) open(name string) (fs.File, error) {
+	if e.Open == nil {
+		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+	}
+	return e.Open(name)
 }

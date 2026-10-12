@@ -67,10 +67,10 @@ func TestTOML(t *testing.T) {
 				"[serve]\naddr = \":80\"\ntags = [\"a\", \"b\"]\nsince = 2026-10-12T09:30:00Z\n",
 			)}}
 			env := &cli.Env{
-				ReadFile: files.ReadFile,
-				Stdout:   &out,
-				Stderr:   &out,
-				Args:     []string{"--config", "srv.toml", "serve"},
+				Open:   files.Open,
+				Stdout: &out,
+				Stderr: &out,
+				Args:   []string{"--config", "srv.toml", "serve"},
 			}
 			assert.NoError(t, app.Execute(t.Context(), env), "Execute reads the TOML file")
 			assert.Equal(t, got, options{
