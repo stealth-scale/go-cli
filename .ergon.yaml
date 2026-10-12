@@ -1,3 +1,6 @@
+# Copyright Stealth Scale B.V. 2026
+# SPDX-License-Identifier: MIT
+
 common:
   # The command that runs ergon in the targets of the Makefile and in the hooks of
   # .pre-commit-config.yaml, as its words, such as [ergon] for the ergon on the PATH. The repository

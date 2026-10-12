@@ -1,3 +1,8 @@
+<!--
+  ~ Copyright Stealth Scale B.V. 2026
+  ~ SPDX-License-Identifier: MIT
+-->
+
 # Changesets
 
 A change that a release contains adds a changeset to this directory. A changeset is a Markdown

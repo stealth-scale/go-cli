@@ -1,3 +1,8 @@
+<!--
+  ~ Copyright Stealth Scale B.V. 2026
+  ~ SPDX-License-Identifier: MIT
+-->
+
 # Contributing to go-cli
 
 ## The gate

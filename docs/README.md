@@ -1,3 +1,8 @@
+<!--
+  ~ Copyright Stealth Scale B.V. 2026
+  ~ SPDX-License-Identifier: MIT
+-->
+
 # Documentation
 
 Where each kind of document is kept, and which one to write.
