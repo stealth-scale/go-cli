@@ -67,5 +67,5 @@ units: check: invalid --webhook "%zz" from flag --webhook: main: parse the URL: 
 [exit 2]
 
 $ units check >/dev/full
-units: main: write the check: transcript: no space left on device
+units: main: write the check: clitest: no space left on device
 [exit 1]

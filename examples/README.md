@@ -13,7 +13,7 @@ the order of the sections of the [README](../README.md) of the repository. The m
 |---|---|
 | [`01-quickstart`](01-quickstart) | the smallest program: a global option, a command with an optional argument and two flags, the help, and the exit status of an error |
 | [`02-tags`](02-tags) | every tag of an option: `help`, `default`, `enum`, `required`, `name`, `short`, `env`, `key` and `secret` |
-| [`03-commands`](03-commands) | three commands that share embedded options, global flags before and after the command, a required enum, the error of a handler, and the suggestion for a command |
+| [`03-commands`](03-commands) | three commands that share embedded options, global flags before and after the command, a required enum, the error of a handler, the suggestion for a command, and a command with a handler, a hook and two subcommands |
 | [`04-arguments`](04-arguments) | positional arguments: a required argument, an optional one and a list, the argument `--`, and a lone `-` |
 | [`05-groups`](05-groups) | groups of options: nested structs, embedded structs, and the tag `prefix` |
 | [`06-types`](06-types) | an option of each type that the package converts without a registration, and the error of each conversion |
@@ -24,7 +24,7 @@ the order of the sections of the [README](../README.md) of the repository. The m
 | [`11-sources`](11-sources) | the order of the sources of an option, `Run.Source`, the flag `--flag-debug`, and an empty path of the config file |
 | [`12-errors`](12-errors) | a program that inspects the error of `App.Execute` in place of `App.Main` |
 | [`13-charm`](13-charm) | the help, the failures and the table of `--flag-debug` through `charm.Register`, and a help at the width in `COLUMNS` |
-| [`14-testing`](14-testing) | the tests of a program: runs with an `Env`, a handler through `NewRun`, the standard input, and a context that has ended |
+| [`14-testing`](14-testing) | the tests of a program without commands: runs with an `Env`, the handler of the app through `NewRun`, the standard input, and a context that has ended |
 
 Each example imports the module `go.stealthscale.io/cli`. The examples `09-yaml`, `10-toml` and
 `13-charm` also import the module of their name.
@@ -35,13 +35,11 @@ Run an example from the directory `examples/`:
 go run ./01-quickstart hello Ada --times 2
 ```
 
-The test of each example runs the command lines of its transcript. It compares the output of the
-runs with `testdata/golden/transcript.txt`, so the golden file shows what the example prints. This
-command writes the transcripts again after a change:
+The test of each example passes the command lines of its transcript to `clitest.Transcript` of the
+package `go.stealthscale.io/cli/clitest`. It compares the transcript with
+`testdata/golden/transcript.txt`, so the golden file shows the config files that the runs read and
+what the example prints. This command writes the transcripts again after a change:
 
 ```sh
-go test ./0... ./1... -update
+go test ./... -update
 ```
-
-The patterns `./0...` and `./1...` match the numbered directories and leave out
-`internal/transcript`, because the test of the harness does not define the flag `-update`.

@@ -1,5 +1,5 @@
 $ deploy --help
-Usage: deploy [global options] <command> [options]
+Usage: deploy <command> [options]
 
 Deploy the service.
 
@@ -7,8 +7,9 @@ Commands:
   plan      Print the changes of a deployment.
   apply     Apply the changes of a deployment.
   rollback  Roll back to an earlier release.
+  registry  Count the images of the registry.
 
-Global options:
+Options:
       --flag-debug  Print the value and the source of each option before the command runs.  env DEPLOY_FLAG_DEBUG
   -h, --help        Show the help.
   -v, --verbose     Print each step.                                                        env DEPLOY_VERBOSE, key verbose
@@ -67,5 +68,51 @@ Global options:
 [exit 0]
 
 $ deploy plan -e dev >/dev/full
-deploy: main: write the result of plan: transcript: no space left on device
+deploy: main: write the result of plan: clitest: no space left on device
 [exit 1]
+
+$ deploy registry
+registry: 4 images in registry.example.com
+[exit 0]
+
+$ deploy -v registry push app:v2
+registry: sign in as deploy@registry.example.com
+push: app:v2 as deploy@registry.example.com
+registry: sign out
+[exit 0]
+
+$ deploy registry --url registry.internal prune --user ci --keep 2
+prune: 2 images kept in registry.internal
+[exit 0]
+
+$ DEPLOY_REGISTRY_USER=ci deploy registry push app:v3
+push: app:v3 as ci@registry.example.com
+[exit 0]
+
+$ deploy registry pusj app:v2
+deploy: registry: unknown command "pusj" (did you mean push?)
+[exit 2]
+
+$ deploy registry push
+deploy: registry push: missing argument IMAGE
+[exit 2]
+
+$ deploy registry --keep 2 prune
+deploy: registry: unknown flag --keep
+[exit 2]
+
+$ deploy registry push --help
+Usage: deploy registry push [options] IMAGE
+
+Push an image to the registry.
+
+Arguments:
+      IMAGE  Image to push.
+
+Global options:
+      --flag-debug   Print the value and the source of each option before the command runs.  env DEPLOY_FLAG_DEBUG
+  -h, --help         Show the help.
+      --url string   URL of the registry.                                                    default "registry.example.com", env DEPLOY_REGISTRY_URL, key registry.url
+      --user string  User of the registry.                                                   default "deploy", env DEPLOY_REGISTRY_USER, key registry.user
+  -v, --verbose      Print each step.                                                        env DEPLOY_VERBOSE, key verbose
+[exit 0]

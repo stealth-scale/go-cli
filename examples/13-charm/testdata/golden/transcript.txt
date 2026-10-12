@@ -2,13 +2,13 @@ $ srv --help
 Serve the store.
 
 USAGE
-  srv [global options] <command> [options]
+  srv <command> [options]
 
 COMMANDS
   serve              Run the server of the store.
   migrate            Migrate the store to the current schema.
 
-GLOBAL OPTIONS
+OPTIONS
   -c, --config file  Config file in JSON.
                      env SRV_CONFIG
       --flag-debug   Print the value and the source of each option before the
@@ -105,5 +105,5 @@ plan: no migration
 [exit 0]
 
 $ srv migrate >/dev/full
-srv: main: write the result: transcript: no space left on device
+srv: main: write the result: clitest: no space left on device
 [exit 1]

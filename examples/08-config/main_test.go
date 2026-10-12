@@ -4,24 +4,28 @@
 package main
 
 import (
+	"os"
 	"testing"
 
 	"go.dokimi.dev/assert/golden"
 
-	"go.stealthscale.io/cli/examples/internal/transcript"
+	"go.stealthscale.io/cli/clitest"
 )
 
+// files are the config files of the example.
+var files = os.DirFS(".")
+
 // runs are the command lines of the transcript of the example.
-var runs = []transcript.Run{
-	{Args: []string{"serve", "--help"}},
-	{Args: []string{"serve"}},
-	{Args: []string{"migrate"}},
-	{Args: []string{"-c", "relay.ini", "serve"}},
-	{Args: []string{"-c", "relay.conf", "serve"}},
-	{Vars: map[string]string{"RELAY_CONFIG": "relay.ini"}, Args: []string{"migrate", "--steps", "1"}},
-	{Args: []string{"-c", "typo.json", "serve"}},
-	{Args: []string{"serve"}, Full: true},
-	{Args: []string{"migrate"}, Full: true},
+var runs = []clitest.Input{
+	{Args: []string{"serve", "--help"}, Files: files},
+	{Args: []string{"serve"}, Files: files},
+	{Args: []string{"migrate"}, Files: files},
+	{Args: []string{"-c", "relay.ini", "serve"}, Files: files},
+	{Args: []string{"-c", "relay.conf", "serve"}, Files: files},
+	{Vars: map[string]string{"RELAY_CONFIG": "relay.ini"}, Args: []string{"migrate", "--steps", "1"}, Files: files},
+	{Args: []string{"-c", "typo.json", "serve"}, Files: files},
+	{Args: []string{"serve"}, Files: files, FailStdout: true},
+	{Args: []string{"migrate"}, Files: files, FailStdout: true},
 }
 
 // TestConfig checks the transcript of the runs of the example.
@@ -33,7 +37,7 @@ func TestConfig(t *testing.T) {
 
 		t.Run("writes the transcript of the runs", func(t *testing.T) {
 			t.Parallel()
-			got := transcript.Write(t.Context(), "relay", runs, app().Main)
+			got := clitest.Transcript(t.Context(), "relay", app().Main, runs...)
 			golden.Match(t, "transcript.txt", got, golden.ShouldUpdate())
 		})
 	})

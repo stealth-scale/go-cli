@@ -1,13 +1,50 @@
+$ cat notify.yaml
+# Copyright Stealth Scale B.V. 2026
+# SPDX-License-Identifier: MIT
+
+send:
+  channels: [email, chat]
+  window: 15m
+  retries: 3
+  smtp:
+    host: smtp.example.com
+    port: 587
+  code:
+    404: page not found
+    500: server error
 $ notify send
 send to ["email" "chat"] through smtp.example.com:587, every 15m0s, retries 3
 code 404: page not found
 code 500: server error
 [exit 0]
 
+$ cat notify.yml
+# Copyright Stealth Scale B.V. 2026
+# SPDX-License-Identifier: MIT
+
+# yaml.Register also registers the extension .yml.
+
+send:
+  channels:
+    - pager
 $ notify -c notify.yml send
 send to ["pager"] through localhost:25, every 5m0s, retries 1
 [exit 0]
 
+$ cat notify.yaml
+# Copyright Stealth Scale B.V. 2026
+# SPDX-License-Identifier: MIT
+
+send:
+  channels: [email, chat]
+  window: 15m
+  retries: 3
+  smtp:
+    host: smtp.example.com
+    port: 587
+  code:
+    404: page not found
+    500: server error
 $ notify send --flag-debug
   OPTION       VALUE                                         SOURCE
   --config     "notify.yaml"                                 default
@@ -22,11 +59,32 @@ code 404: page not found
 code 500: server error
 [exit 0]
 
+$ cat broken.yaml
+# Copyright Stealth Scale B.V. 2026
+# SPDX-License-Identifier: MIT
+
+# The run fails because the top level of this file is a sequence and not a mapping.
+
+- send
 $ notify -c broken.yaml send
 notify: send: config file broken.yaml: yaml: decode: yaml: unmarshal errors:
   line 6: cannot unmarshal !!seq into map[string]interface {}
 [exit 2]
 
+$ cat notify.yaml
+# Copyright Stealth Scale B.V. 2026
+# SPDX-License-Identifier: MIT
+
+send:
+  channels: [email, chat]
+  window: 15m
+  retries: 3
+  smtp:
+    host: smtp.example.com
+    port: 587
+  code:
+    404: page not found
+    500: server error
 $ notify send >/dev/full
-notify: main: write the options: transcript: no space left on device
+notify: main: write the options: clitest: no space left on device
 [exit 1]

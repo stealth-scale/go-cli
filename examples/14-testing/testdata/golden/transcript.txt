@@ -1,23 +1,34 @@
-$ printf 'one two\nthree four\nfive\n' | wc count
+# Without an option, wc writes every number.
+$ printf 'one two\nthree four\nfive\n' | wc
 3 5 24
 [exit 0]
 
-$ printf 'one two\nthree four\nfive\n' | wc count --words
+# The flag --words selects the number of words.
+$ printf 'one two\nthree four\nfive\n' | wc --words
 5
 [exit 0]
 
-$ printf 'one two\nthree four\nfive\n' | wc count -lc
+# Short flags combine in one argument.
+$ printf 'one two\nthree four\nfive\n' | wc -lc
 3 24
 [exit 0]
 
-$ wc count --lines
+# An empty standard input has no lines.
+$ wc --lines
 0
 [exit 0]
 
-$ printf 'one two\nthree four\nfive\n' | wc count --chars
-wc: count: unknown flag --chars
+# An unknown flag fails with the exit status 2.
+$ printf 'one two\nthree four\nfive\n' | wc --chars
+wc: unknown flag --chars
 [exit 2]
 
-$ printf 'one two\nthree four\nfive\n' | wc count >/dev/full
-wc: main: write the numbers: transcript: no space left on device
+# A failed write fails with the exit status 1.
+$ printf 'one two\nthree four\nfive\n' | wc >/dev/full
+wc: main: write the numbers: clitest: no space left on device
+[exit 1]
+
+# A failed read fails with the exit status 1.
+$ wc <&-
+wc: main: read the standard input: clitest: bad file descriptor
 [exit 1]

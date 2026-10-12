@@ -29,6 +29,18 @@ backend http://localhost:9000 within 30s
 cache "" of 64 MB, log info
 [exit 0]
 
+$ cat proxy.json
+{
+  "serve": {
+    "level": "warn",
+    "admin": {
+      "addr": "127.0.0.1:9443",
+      "tls": {"cert": "admin.pem", "key": "admin.key"}
+    },
+    "backend": {"url": "http://10.0.0.7:9000"},
+    "cache": {"size": 128}
+  }
+}
 $ PROXY_SERVE_ADMIN_TLS_CERT=rotated.pem PROXY_SERVE_BACKEND_TIMEOUT=5s proxy -c proxy.json serve --cache-dir /var/cache/proxy --flag-debug
   OPTION             VALUE                   SOURCE
   --config           "proxy.json"            flag --config
@@ -50,5 +62,5 @@ cache "/var/cache/proxy" of 128 MB, log warn
 [exit 0]
 
 $ proxy serve >/dev/full
-proxy: main: write the options: transcript: no space left on device
+proxy: main: write the options: clitest: no space left on device
 [exit 1]

@@ -16,6 +16,17 @@ Global options:
   -h, --help         Show the help.
 [exit 0]
 
+$ cat relay.json
+{
+  "database": {"url": "postgres://db.internal/relay"},
+  "serve": {
+    "addr": ":9000",
+    "allow": ["https://app.example.com", "https://admin.example.com"],
+    "route": {"/api": "http://api:8080", "/static": "http://cdn:8080"},
+    "tls": {"cert": "relay.pem"}
+  },
+  "migrate": {"steps": 3}
+}
 $ relay serve
 listen on :9000 with "relay.pem"
 database postgres://db.internal/relay
@@ -24,10 +35,43 @@ route /api to http://api:8080
 route /static to http://cdn:8080
 [exit 0]
 
+$ cat relay.json
+{
+  "database": {"url": "postgres://db.internal/relay"},
+  "serve": {
+    "addr": ":9000",
+    "allow": ["https://app.example.com", "https://admin.example.com"],
+    "route": {"/api": "http://api:8080", "/static": "http://cdn:8080"},
+    "tls": {"cert": "relay.pem"}
+  },
+  "migrate": {"steps": 3}
+}
 $ relay migrate
 migrate postgres://db.internal/relay, steps 3
 [exit 0]
 
+$ cat relay.ini
+; Copyright Stealth Scale B.V. 2026
+; SPDX-License-Identifier: MIT
+
+; This file contains the options of relay.json in INI. A section contains the keys of a command, a
+; group or a map. A value is text, so commas separate the values of a list.
+
+[database]
+url = postgres://db.internal/relay
+
+[serve]
+addr = :9001
+allow = https://app.example.com,https://admin.example.com
+
+[serve.route]
+/api = http://api:8080
+
+[serve.tls]
+cert = "relay ini.pem"
+
+[migrate]
+steps = 2
 $ relay -c relay.ini serve
 listen on :9001 with "relay ini.pem"
 database postgres://db.internal/relay
@@ -35,24 +79,80 @@ allow ["https://app.example.com" "https://admin.example.com"]
 route /api to http://api:8080
 [exit 0]
 
+$ cat relay.conf
+; Copyright Stealth Scale B.V. 2026
+; SPDX-License-Identifier: MIT
+
+; This file is in INI. app registers INI for the extension .conf.
+
+[serve]
+addr = :9002
 $ relay -c relay.conf serve
 listen on :9002 with ""
 database postgres://localhost/relay
 allow []
 [exit 0]
 
+$ cat relay.ini
+; Copyright Stealth Scale B.V. 2026
+; SPDX-License-Identifier: MIT
+
+; This file contains the options of relay.json in INI. A section contains the keys of a command, a
+; group or a map. A value is text, so commas separate the values of a list.
+
+[database]
+url = postgres://db.internal/relay
+
+[serve]
+addr = :9001
+allow = https://app.example.com,https://admin.example.com
+
+[serve.route]
+/api = http://api:8080
+
+[serve.tls]
+cert = "relay ini.pem"
+
+[migrate]
+steps = 2
 $ RELAY_CONFIG=relay.ini relay migrate --steps 1
 migrate postgres://db.internal/relay, steps 1
 [exit 0]
 
+$ cat typo.json
+{
+  "serve": {"adr": ":9000"}
+}
 $ relay -c typo.json serve
 relay: serve: unknown key serve.adr in typo.json (did you mean serve.addr?)
 [exit 2]
 
+$ cat relay.json
+{
+  "database": {"url": "postgres://db.internal/relay"},
+  "serve": {
+    "addr": ":9000",
+    "allow": ["https://app.example.com", "https://admin.example.com"],
+    "route": {"/api": "http://api:8080", "/static": "http://cdn:8080"},
+    "tls": {"cert": "relay.pem"}
+  },
+  "migrate": {"steps": 3}
+}
 $ relay serve >/dev/full
-relay: main: write the options of the server: transcript: no space left on device
+relay: main: write the options of the server: clitest: no space left on device
 [exit 1]
 
+$ cat relay.json
+{
+  "database": {"url": "postgres://db.internal/relay"},
+  "serve": {
+    "addr": ":9000",
+    "allow": ["https://app.example.com", "https://admin.example.com"],
+    "route": {"/api": "http://api:8080", "/static": "http://cdn:8080"},
+    "tls": {"cert": "relay.pem"}
+  },
+  "migrate": {"steps": 3}
+}
 $ relay migrate >/dev/full
-relay: main: write the options of the migration: transcript: no space left on device
+relay: main: write the options of the migration: clitest: no space left on device
 [exit 1]

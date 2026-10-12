@@ -4,22 +4,26 @@
 package main
 
 import (
+	"os"
 	"testing"
 
 	"go.dokimi.dev/assert/golden"
 
-	"go.stealthscale.io/cli/examples/internal/transcript"
+	"go.stealthscale.io/cli/clitest"
 )
 
+// files are the config files of the example.
+var files = os.DirFS(".")
+
 // runs are the command lines of the transcript of the example.
-var runs = []transcript.Run{
-	{Args: []string{"get"}},
-	{Vars: map[string]string{"FETCH_GET_TIMEOUT": "1m"}, Args: []string{"get"}},
-	{Vars: map[string]string{"FETCH_GET_TIMEOUT": "1m"}, Args: []string{"get", "--timeout", "2m"}},
-	{Vars: map[string]string{"FETCH_CONFIG": ""}, Args: []string{"get"}},
-	{Args: []string{"get", "--flag-debug", "--agent", "curl/8.10"}},
-	{Vars: map[string]string{"FETCH_FLAG_DEBUG": "true"}, Args: []string{"get", "--retries", "0"}},
-	{Args: []string{"get"}, Full: true},
+var runs = []clitest.Input{
+	{Args: []string{"get"}, Files: files},
+	{Vars: map[string]string{"FETCH_GET_TIMEOUT": "1m"}, Args: []string{"get"}, Files: files},
+	{Vars: map[string]string{"FETCH_GET_TIMEOUT": "1m"}, Args: []string{"get", "--timeout", "2m"}, Files: files},
+	{Vars: map[string]string{"FETCH_CONFIG": ""}, Args: []string{"get"}, Files: files},
+	{Args: []string{"get", "--flag-debug", "--agent", "curl/8.10"}, Files: files},
+	{Vars: map[string]string{"FETCH_FLAG_DEBUG": "true"}, Args: []string{"get", "--retries", "0"}, Files: files},
+	{Args: []string{"get"}, Files: files, FailStdout: true},
 }
 
 // TestSources checks the transcript of the runs of the example.
@@ -31,7 +35,7 @@ func TestSources(t *testing.T) {
 
 		t.Run("writes the transcript of the runs", func(t *testing.T) {
 			t.Parallel()
-			got := transcript.Write(t.Context(), "fetch", runs, app().Main)
+			got := clitest.Transcript(t.Context(), "fetch", app().Main, runs...)
 			golden.Match(t, "transcript.txt", got, golden.ShouldUpdate())
 		})
 	})

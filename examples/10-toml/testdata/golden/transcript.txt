@@ -1,7 +1,29 @@
+$ cat schedule.toml
+# Copyright Stealth Scale B.V. 2026
+# SPDX-License-Identifier: MIT
+
+[backup]
+start = 2026-10-12T02:00:00Z
+every = "12h"
+targets = ["database", "uploads"]
+
+[backup.retention]
+days = 30
 $ schedule backup
 back up ["database" "uploads"] from 2026-10-12T02:00:00Z every 12h0m0s, keep 30 days
 [exit 0]
 
+$ cat schedule.toml
+# Copyright Stealth Scale B.V. 2026
+# SPDX-License-Identifier: MIT
+
+[backup]
+start = 2026-10-12T02:00:00Z
+every = "12h"
+targets = ["database", "uploads"]
+
+[backup.retention]
+days = 30
 $ SCHEDULE_BACKUP_EVERY=6h schedule backup --flag-debug
   OPTION            VALUE                   SOURCE
   --config          "schedule.toml"         default
@@ -12,10 +34,29 @@ $ SCHEDULE_BACKUP_EVERY=6h schedule backup --flag-debug
 back up ["database" "uploads"] from 2026-10-12T02:00:00Z every 6h0m0s, keep 30 days
 [exit 0]
 
+$ cat broken.toml
+# Copyright Stealth Scale B.V. 2026
+# SPDX-License-Identifier: MIT
+
+# The run fails because the duration every does not have a unit.
+
+[backup]
+every = 12
 $ schedule -c broken.toml backup
 schedule: backup: invalid --every "12" from key backup.every of broken.toml: time: missing unit in duration "12"
 [exit 2]
 
+$ cat schedule.toml
+# Copyright Stealth Scale B.V. 2026
+# SPDX-License-Identifier: MIT
+
+[backup]
+start = 2026-10-12T02:00:00Z
+every = "12h"
+targets = ["database", "uploads"]
+
+[backup.retention]
+days = 30
 $ schedule backup >/dev/full
-schedule: main: write the schedule: transcript: no space left on device
+schedule: main: write the schedule: clitest: no space left on device
 [exit 1]

@@ -72,5 +72,5 @@ list the files that match ["*.log" "app-*"]
 [exit 0]
 
 $ pack create logs >/dev/full
-pack: main: write the result: transcript: no space left on device
+pack: main: write the result: clitest: no space left on device
 [exit 1]

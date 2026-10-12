@@ -8,11 +8,11 @@ import (
 
 	"go.dokimi.dev/assert/golden"
 
-	"go.stealthscale.io/cli/examples/internal/transcript"
+	"go.stealthscale.io/cli/clitest"
 )
 
 // runs are the command lines of the transcript of the example.
-var runs = []transcript.Run{
+var runs = []clitest.Input{
 	{Args: []string{"--help"}},
 	{Args: []string{"serve", "--help"}},
 	{Vars: map[string]string{"COLUMNS": "60"}, Args: []string{"serve", "--help"}},
@@ -20,7 +20,7 @@ var runs = []transcript.Run{
 	{Args: []string{"serve"}},
 	{Vars: map[string]string{"SRV_SERVE_TOKEN": "s3cret"}, Args: []string{"serve", "store-2", "--flag-debug"}},
 	{Args: []string{"migrate", "-n"}},
-	{Args: []string{"migrate"}, Full: true},
+	{Args: []string{"migrate"}, FailStdout: true},
 }
 
 // TestCharm checks the transcript of the runs of the example.
@@ -32,7 +32,7 @@ func TestCharm(t *testing.T) {
 
 		t.Run("writes the transcript of the runs", func(t *testing.T) {
 			t.Parallel()
-			got := transcript.Write(t.Context(), "srv", runs, app().Main)
+			got := clitest.Transcript(t.Context(), "srv", app().Main, runs...)
 			golden.Match(t, "transcript.txt", got, golden.ShouldUpdate())
 		})
 	})

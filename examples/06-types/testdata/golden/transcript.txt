@@ -122,5 +122,5 @@ types: show: invalid --limits "cpu" from flag --limits: want key=value
 [exit 2]
 
 $ types show >/dev/full
-types: main: write the options: transcript: no space left on device
+types: main: write the options: clitest: no space left on device
 [exit 1]

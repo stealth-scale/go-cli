@@ -32,11 +32,15 @@ lint: run: invalid --format "xml" from env LINT_RUN_FORMAT: want text or json
 hint: the value "xml" of --format comes from env LINT_RUN_FORMAT
 [exit 2]
 
+$ cat lint.json
+{
+  "run": {"max-issue": 5}
+}
 $ lint -c lint.json run src
 lint: run: unknown key run.max-issue in lint.json (did you mean run.max-issues?)
 hint: lint --help lists the options
 [exit 2]
 
 $ lint run src >/dev/full
-lint: main: write the report: transcript: no space left on device
+lint: main: write the report: clitest: no space left on device
 [exit 1]

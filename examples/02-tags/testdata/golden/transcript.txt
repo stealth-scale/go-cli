@@ -53,5 +53,5 @@ backup: run: invalid --compression "rar" from flag --compression: want none, gzi
 [exit 2]
 
 $ backup run --bucket nightly >/dev/full
-backup: main: write the plan: transcript: no space left on device
+backup: main: write the plan: clitest: no space left on device
 [exit 1]

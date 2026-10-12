@@ -8,11 +8,11 @@ import (
 
 	"go.dokimi.dev/assert/golden"
 
-	"go.stealthscale.io/cli/examples/internal/transcript"
+	"go.stealthscale.io/cli/clitest"
 )
 
 // runs are the command lines of the transcript of the example.
-var runs = []transcript.Run{
+var runs = []clitest.Input{
 	{Args: []string{"show", "--help"}},
 	{Args: []string{"show"}},
 	{Args: []string{
@@ -35,7 +35,7 @@ var runs = []transcript.Run{
 	{Args: []string{"show", "--network", "10.0.0.0/33"}},
 	{Args: []string{"show", "--mode", "0999"}},
 	{Args: []string{"show", "--limits", "cpu"}},
-	{Args: []string{"show"}, Full: true},
+	{Args: []string{"show"}, FailStdout: true},
 }
 
 // TestTypes checks the transcript of the runs of the example.
@@ -47,7 +47,7 @@ func TestTypes(t *testing.T) {
 
 		t.Run("writes the transcript of the runs", func(t *testing.T) {
 			t.Parallel()
-			got := transcript.Write(t.Context(), "types", runs, app().Main)
+			got := clitest.Transcript(t.Context(), "types", app().Main, runs...)
 			golden.Match(t, "transcript.txt", got, golden.ShouldUpdate())
 		})
 	})

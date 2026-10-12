@@ -2,14 +2,15 @@
 // SPDX-License-Identifier: MIT
 
 // Command testing is a program that reads its standard input. The tests in main_test.go show how to
-// test a program of the cli package.
+// test a program of the cli package with the package clitest.
 //
-//	printf 'one two\nthree\n' | go run ./14-testing count --words
+//	printf 'one two\nthree\n' | go run ./14-testing --words
 //
-// A test runs the program with a cli.Env of its own. The Env contains the arguments, the environment
-// variables, the standard input and the buffers of the output. The tests of the handler call it
-// through cli.NewRun without the program. One of them checks that the handler honours the
-// cancellation of its context.
+// The program has no commands, so the handler of the app runs every command line. clitest.Transcript
+// runs a list of command lines and returns the transcript that the golden file contains.
+// clitest.Main runs one command line. clitest.NewEnv returns the Env of a test that calls
+// App.Execute, and the Env of a test that calls the handler through cli.NewRun. One test of the
+// handler checks that it honours the cancellation of its context.
 package main
 
 import (
@@ -23,7 +24,7 @@ import (
 	"go.stealthscale.io/cli"
 )
 
-// Count contains the options of the command count. Without an option, count writes every number.
+// Count contains the options of the program wc. Without an option, wc writes every number.
 type Count struct {
 	Lines bool `help:"Write the number of lines." short:"l"`
 	Words bool `help:"Write the number of words." short:"w"`
@@ -34,10 +35,10 @@ func main() {
 	os.Exit(app().Main(context.Background(), cli.OS()))
 }
 
-// app returns the program wc with the command count.
-func app() *cli.App[struct{}] {
-	a := cli.New[struct{}]("wc", "Count the lines, the words and the bytes of the standard input.")
-	a.Command("count", "Write the numbers of the standard input.", count)
+// app returns the program wc, whose handler is count.
+func app() *cli.App[Count] {
+	a := cli.New[Count]("wc", "Count the lines, the words and the bytes of the standard input.")
+	a.Handle(count)
 	return a
 }
 
@@ -46,7 +47,7 @@ func app() *cli.App[struct{}] {
 // Error modes:
 //   - the error of ctx when ctx has ended before the read.
 //   - the error of the standard input and the error of the standard output.
-func count(ctx context.Context, run *cli.Run[struct{}, Count]) error {
+func count(ctx context.Context, run *cli.Run[Count, Count]) error {
 	if err := ctx.Err(); err != nil {
 		return fmt.Errorf("main: count the standard input: %w", err)
 	}

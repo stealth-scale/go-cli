@@ -17,14 +17,14 @@ greet: hello: invalid --times "twice" from flag --times: invalid syntax
 [exit 2]
 
 $ greet --help
-Usage: greet [global options] <command> [options]
+Usage: greet <command> [options]
 
 Greet someone.
 
 Commands:
   hello  Print a greeting.
 
-Global options:
+Options:
       --flag-debug  Print the value and the source of each option before the command runs.  env GREET_FLAG_DEBUG
   -h, --help        Show the help.
   -v, --verbose     Print the options of the greeting.                                      env GREET_VERBOSE, key verbose
@@ -49,20 +49,21 @@ Global options:
 [exit 0]
 
 $ greet
-Usage: greet [global options] <command> [options]
+Usage: greet <command> [options]
 
 Greet someone.
 
 Commands:
   hello  Print a greeting.
 
-Global options:
+Options:
       --flag-debug  Print the value and the source of each option before the command runs.  env GREET_FLAG_DEBUG
   -h, --help        Show the help.
   -v, --verbose     Print the options of the greeting.                                      env GREET_VERBOSE, key verbose
+
 greet: missing command
 [exit 2]
 
 $ greet hello >/dev/full
-greet: main: write the greeting: transcript: no space left on device
+greet: main: write the greeting: clitest: no space left on device
 [exit 1]

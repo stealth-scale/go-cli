@@ -8,11 +8,11 @@ import (
 
 	"go.dokimi.dev/assert/golden"
 
-	"go.stealthscale.io/cli/examples/internal/transcript"
+	"go.stealthscale.io/cli/clitest"
 )
 
 // runs are the command lines of the transcript of the example.
-var runs = []transcript.Run{
+var runs = []clitest.Input{
 	{Args: []string{"--help"}},
 	{Args: []string{"plan", "--env", "prod"}},
 	{Args: []string{"-v", "apply", "-e", "prod", "-y"}},
@@ -23,7 +23,15 @@ var runs = []transcript.Run{
 	{Args: []string{"plan", "--env", "staging"}},
 	{Args: []string{"aply", "-e", "dev"}},
 	{Args: []string{"rollback", "--help"}},
-	{Args: []string{"plan", "-e", "dev"}, Full: true},
+	{Args: []string{"plan", "-e", "dev"}, FailStdout: true},
+	{Args: []string{"registry"}},
+	{Args: []string{"-v", "registry", "push", "app:v2"}},
+	{Args: []string{"registry", "--url", "registry.internal", "prune", "--user", "ci", "--keep", "2"}},
+	{Vars: map[string]string{"DEPLOY_REGISTRY_USER": "ci"}, Args: []string{"registry", "push", "app:v3"}},
+	{Args: []string{"registry", "pusj", "app:v2"}},
+	{Args: []string{"registry", "push"}},
+	{Args: []string{"registry", "--keep", "2", "prune"}},
+	{Args: []string{"registry", "push", "--help"}},
 }
 
 // TestCommands checks the transcript of the runs of the example.
@@ -35,7 +43,7 @@ func TestCommands(t *testing.T) {
 
 		t.Run("writes the transcript of the runs", func(t *testing.T) {
 			t.Parallel()
-			got := transcript.Write(t.Context(), "deploy", runs, app().Main)
+			got := clitest.Transcript(t.Context(), "deploy", app().Main, runs...)
 			golden.Match(t, "transcript.txt", got, golden.ShouldUpdate())
 		})
 	})

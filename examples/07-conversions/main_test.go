@@ -8,11 +8,11 @@ import (
 
 	"go.dokimi.dev/assert/golden"
 
-	"go.stealthscale.io/cli/examples/internal/transcript"
+	"go.stealthscale.io/cli/clitest"
 )
 
 // runs are the command lines of the transcript of the example.
-var runs = []transcript.Run{
+var runs = []clitest.Input{
 	{Args: []string{"check", "--help"}},
 	{Args: []string{"check"}},
 	{Args: []string{
@@ -29,7 +29,7 @@ var runs = []transcript.Run{
 	{Args: []string{"check", "--origin", "3"}},
 	{Args: []string{"check", "--webhook", "http://hooks.example.com/alerts"}},
 	{Args: []string{"check", "--webhook", "%zz"}},
-	{Args: []string{"check"}, Full: true},
+	{Args: []string{"check"}, FailStdout: true},
 }
 
 // TestConversions checks the transcript of the runs of the example.
@@ -41,7 +41,7 @@ func TestConversions(t *testing.T) {
 
 		t.Run("writes the transcript of the runs", func(t *testing.T) {
 			t.Parallel()
-			got := transcript.Write(t.Context(), "units", runs, app().Main)
+			got := clitest.Transcript(t.Context(), "units", app().Main, runs...)
 			golden.Match(t, "transcript.txt", got, golden.ShouldUpdate())
 		})
 	})
