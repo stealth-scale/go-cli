@@ -210,6 +210,14 @@ func TestConvert(t *testing.T) {
 			}, "the run converts each standard type")
 		})
 
+		t.Run("converts a file mode with the prefix 0o", func(t *testing.T) {
+			t.Parallel()
+			app, got := serving[struct{}, builtinOptions](t)
+			res := execute(t, app, []string{command, "--socket", "0o640"}, nil, nil)
+			assert.NoError(t, res.err, "Execute runs the command")
+			assert.Equal(t, got.Config().Socket, fs.FileMode(0o640), "the run reads the digits after 0o as octal")
+		})
+
 		t.Run("converts the types with a text method", func(t *testing.T) {
 			t.Parallel()
 			app, got := serving[struct{}, methodOptions](t)

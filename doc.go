@@ -70,8 +70,8 @@
 // [encoding.TextUnmarshaler], a pointer that implements [flag.Value], [time.Duration], and the
 // kinds string, bool, int, uint and float. The built-in conversions read url.URL through
 // url.Parse, time.Location through time.LoadLocation, net.IPNet through net.ParseCIDR and
-// fs.FileMode as an octal number such as 0644. A slice takes values that commas separate, a map
-// takes entries of the form key=value, and a pointer is nil until a source sets it.
+// fs.FileMode as an octal number such as 0644 or 0o644. A slice takes values that commas separate,
+// a map takes entries of the form key=value, and a pointer is nil until a source sets it.
 //
 // # Sources
 //

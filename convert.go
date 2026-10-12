@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -29,7 +30,7 @@ type converter func(s string) (reflect.Value, string)
 
 // builtins returns the conversions of the standard types that have no text method of their own:
 // url.URL and *url.URL through url.Parse, *time.Location through time.LoadLocation, net.IPNet and
-// *net.IPNet through net.ParseCIDR, and fs.FileMode as an octal number such as 0644.
+// *net.IPNet through net.ParseCIDR, and fs.FileMode as an octal number such as 0644 or 0o644.
 func builtins() map[reflect.Type]converter {
 	return map[reflect.Type]converter{
 		reflect.TypeFor[*url.URL]():       convertWith(url.Parse),
@@ -56,7 +57,7 @@ func builtins() map[reflect.Type]converter {
 			return reflect.ValueOf(*n), ""
 		},
 		reflect.TypeFor[fs.FileMode](): func(s string) (reflect.Value, string) {
-			n, err := strconv.ParseUint(s, 8, 32)
+			n, err := strconv.ParseUint(strings.TrimPrefix(s, "0o"), 8, 32)
 			return kindValue(reflect.TypeFor[fs.FileMode](), err, func(v reflect.Value) { v.SetUint(n) })
 		},
 	}
