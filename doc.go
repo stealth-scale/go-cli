@@ -115,12 +115,20 @@
 // [ErrEnv] for an incomplete [Env]. [App.Main] writes the error and returns [ExitUsage] or
 // [ExitFailure].
 //
+// # Output
+//
+// The [Renderer] of an app writes the help, the [Failure] of a run and the rows of --flag-debug.
+// [App.Render] registers it. An app without a call uses [Plain], which writes plain text in
+// columns. The module go.stealthscale.io/cli/charm renders the same output with Lip Gloss. A
+// renderer receives the environment of the run from [Env.Environ], and [Run.Environ] returns that
+// environment to a handler.
+//
 // # Testing
 //
 // An [Env] contains the arguments, the environment variables, the files and the standard streams
 // of a run, so a test runs a program without the state of its process. [Vars] returns the
-// environment variables of a map. [NewRun] returns the [Run] of a handler for a test that calls the
-// handler without [App.Execute].
+// environment variables of a map, and [Environ] lists the variables of the same map. [NewRun]
+// returns the [Run] of a handler for a test that calls the handler without [App.Execute].
 //
 // # Concurrency
 //

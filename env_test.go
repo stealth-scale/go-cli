@@ -35,6 +35,7 @@ func TestEnv(t *testing.T) {
 			t.Parallel()
 			env := cli.OS()
 			assert.Equal(t, env.Lookup, os.LookupEnv, "OS looks up the variables with os.LookupEnv")
+			assert.Equal(t, env.Environ, os.Environ, "OS lists the variables with os.Environ")
 			assert.Equal(t, env.ReadFile, os.ReadFile, "OS reads the files with os.ReadFile")
 		})
 
@@ -70,6 +71,31 @@ func TestEnv(t *testing.T) {
 			vars["SRV_ADDR"] = ":81"
 			v, _ := lookup("SRV_ADDR")
 			assert.Equal(t, v, ":80", "Vars reports the value at the call of Vars")
+		})
+	})
+
+	t.Run("Environ", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("returns the variables of the map as pairs in the order of their names", func(t *testing.T) {
+			t.Parallel()
+			got := cli.Environ(map[string]string{"TERM": "xterm", "NO_COLOR": "1", "EMPTY": ""})()
+			assert.Equal(t, got, []string{"EMPTY=", "NO_COLOR=1", "TERM=xterm"}, "Environ returns KEY=value pairs")
+		})
+
+		t.Run("returns the variables of the map at the call", func(t *testing.T) {
+			t.Parallel()
+			vars := map[string]string{"TERM": "xterm"}
+			environ := cli.Environ(vars)
+			vars["TERM"] = "dumb"
+			assert.Equal(t, environ(), []string{"TERM=xterm"}, "Environ returns the value at the call of Environ")
+		})
+
+		t.Run("returns a list of its own to each caller", func(t *testing.T) {
+			t.Parallel()
+			environ := cli.Environ(map[string]string{"TERM": "xterm"})
+			environ()[0] = "TERM=dumb"
+			assert.Equal(t, environ(), []string{"TERM=xterm"}, "a change of one result leaves the next result intact")
 		})
 	})
 

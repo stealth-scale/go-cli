@@ -7,10 +7,10 @@ package cli
 // suggests for it.
 const maxDistance = 2
 
-// suggestion returns " (did you mean <prefix><candidate>?)" for the candidate closest to name, or
-// the empty string when no candidate is within maxDistance edits of name. Of two candidates at one
-// distance, suggestion returns the first in candidates.
-func suggestion(name string, candidates []string, prefix string) string {
+// suggest returns prefix and the candidate closest to name, such as --addr, or the empty string
+// when no candidate is within maxDistance edits of name. Of two candidates at one distance, suggest
+// returns the first in candidates.
+func suggest(name string, candidates []string, prefix string) string {
 	best, bestDistance := "", maxDistance+1
 	for _, c := range candidates {
 		if d := distance(name, c); d < bestDistance {
@@ -20,7 +20,7 @@ func suggestion(name string, candidates []string, prefix string) string {
 	if best == "" {
 		return ""
 	}
-	return " (did you mean " + prefix + best + "?)"
+	return prefix + best
 }
 
 // distance returns the Levenshtein distance between the bytes of a and b: the least number of

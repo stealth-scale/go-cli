@@ -43,12 +43,13 @@ var (
 //
 // An Error does not change after [App.Execute] returns it, so any number of goroutines may read it.
 type Error struct {
-	Err     error  // the sentinel
-	Command string // the command of the run, or empty for an input before the command
-	Input   string // the command, the flag, the config key, the argument or the config file at fault
-	Value   string // the value at fault, or empty
-	text    string // the message without the package name and the command
-	Source  Source // the source of Value, or the zero Source
+	Err        error  // the sentinel
+	Command    string // the command of the run, or empty for an input before the command
+	Input      string // the command, the flag, the config key, the argument or the config file at fault
+	Value      string // the value at fault, or empty
+	Suggestion string // the name that the package suggests in place of Input, or empty
+	text       string // the message without the package name, the command and the suggestion
+	Source     Source // the source of Value, or the zero Source
 }
 
 // Error returns [Error.Message] after the package name, such as
@@ -62,12 +63,9 @@ func (e *Error) Unwrap() error {
 	return e.Err
 }
 
-// Message returns the message of e after its command, such as
+// Message returns the message of e after its command and before its suggestion, such as
 // "serve: unknown flag --adr (did you mean --addr?)". The message does not contain the package
 // name. [App.Main] writes it after the name of the app.
 func (e *Error) Message() string {
-	if e.Command == "" {
-		return e.text
-	}
-	return e.Command + ": " + e.text
+	return message(e.Command, e.text, e.Suggestion)
 }

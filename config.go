@@ -122,10 +122,11 @@ func (a *App[G]) applyConfig(env *Env, d *declaration[G], in *input[G]) error {
 			}
 		case !slices.Contains(known, key):
 			return &Error{
-				Err:    ErrUnknownKey,
-				Input:  key,
-				Source: src,
-				text:   "unknown key " + key + " in " + path + suggestion(key, known, ""),
+				Err:        ErrUnknownKey,
+				Input:      key,
+				Source:     src,
+				Suggestion: suggest(key, known, ""),
+				text:       "unknown key " + key + " in " + path,
 			}
 		}
 	}

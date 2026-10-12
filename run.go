@@ -68,6 +68,13 @@ func (r *Run[G, C]) Stderr() io.Writer {
 	return r.env.Stderr
 }
 
+// Environ returns the environment of the run as KEY=value pairs, or nil for an [Env] without
+// Environ. A handler passes it to a library that reads the environment, such as a terminal library
+// that chooses its colors.
+func (r *Run[G, C]) Environ() []string {
+	return r.env.environ()
+}
+
 // Source returns the source of the option at field, a pointer to a field of [Run.Global] or
 // [Run.Config]. It reports false for any other pointer, and for every option of a run that
 // [NewRun] returns.

@@ -4,8 +4,6 @@
 package cli
 
 import (
-	"fmt"
-	"io"
 	"reflect"
 	"slices"
 	"strconv"
@@ -27,54 +25,55 @@ const (
 	helpText = "Show the help."
 )
 
-// writeHelp writes the help of the command of in to w, or the help of the app when in has no
-// command. The help lists the commands of the app, or the positional arguments and the options of
-// the command, and then the global options with the flags of the help among them. The row of an
-// option includes its default, its environment variable and its config key.
-//
-// Error modes:
-//   - an error that wraps the error of w.
-func (a *App[G]) writeHelp(w io.Writer, d *declaration[G], in *input[G]) error {
-	var b strings.Builder
+// helpOf returns the help of the command of in, or the help of the app when in has no command. The
+// help lists the commands of the app, or the positional arguments and the options of the command.
+// It lists the global options with the flags of the help among them.
+func (a *App[G]) helpOf(d *declaration[G], in *input[G]) *Help {
+	h := &Help{App: a.name}
 	if in.cmd == nil {
-		b.WriteString("Usage: " + a.name + " [global options] <command> [options]\n")
-		if a.help != "" {
-			b.WriteString("\n" + a.help + "\n")
-		}
-		rows := make([][3]string, len(d.commands))
+		h.Usage = []string{"[global options]", "<command>", "[options]"}
+		h.Text = a.help
+		h.Commands = make([]HelpCommand, len(d.commands))
 		for i, c := range d.commands {
-			rows[i] = [3]string{c.cmd.name, c.cmd.help}
+			h.Commands[i] = HelpCommand{Name: c.cmd.name, Text: c.cmd.help}
 		}
-		writeSection(&b, "Commands", rows)
 	} else {
-		usage := []string{a.name, in.cmd.cmd.name, "[options]"}
-		var options, args [][3]string
+		h.Command = in.cmd.cmd.name
+		h.Usage = []string{"[options]"}
+		h.Text = in.cmd.cmd.help
 		for _, o := range ordered(in.cmd.options) {
 			if o.arg {
-				usage = append(usage, o.usage())
-				args = append(args, [3]string{noShort + o.label(), o.help, o.notes()})
+				h.Usage = append(h.Usage, o.usage())
+				h.Arguments = append(h.Arguments, o.helpOption())
 			} else {
-				options = append(options, o.row())
+				h.Options = append(h.Options, o.helpOption())
 			}
 		}
-		b.WriteString("Usage: " + strings.Join(usage, " ") + "\n")
-		if in.cmd.cmd.help != "" {
-			b.WriteString("\n" + in.cmd.cmd.help + "\n")
-		}
-		writeSection(&b, "Arguments", args)
-		writeSection(&b, "Options", options)
 	}
 	help := &option{value: reflect.New(reflect.TypeFor[bool]()).Elem(), name: helpName, help: helpText, short: helpRune}
-	globals := ordered(slices.Concat(d.globals, []*option{help}))
-	rows := make([][3]string, len(globals))
-	for i, o := range globals {
-		rows[i] = o.row()
+	for _, o := range ordered(slices.Concat(d.globals, []*option{help})) {
+		h.Globals = append(h.Globals, o.helpOption())
 	}
-	writeSection(&b, "Global options", rows)
-	if _, err := io.WriteString(w, b.String()); err != nil {
-		return fmt.Errorf("cli: write the help: %w", err)
+	return h
+}
+
+// helpOption returns o as an option of the help. The default of a secret option is masked.
+func (o *option) helpOption() HelpOption {
+	h := HelpOption{Name: o.label(), Text: o.help, Env: o.env, Key: o.key, Required: o.required}
+	if o.short != 0 {
+		h.Short = shortPrefix + string(o.short)
 	}
-	return nil
+	if !o.arg {
+		h.Placeholder = o.placeholder()
+	}
+	if o.hasDef {
+		def := o.defText
+		if o.secret {
+			def = secretText
+		}
+		h.Default = strconv.Quote(def)
+	}
+	return h
 }
 
 // usage returns the positional argument o in the usage line of the help: its label, with an
@@ -90,54 +89,21 @@ func (o *option) usage() string {
 	return s
 }
 
-// row returns the row of the option o in the help: the flags and the placeholder of the value, the
-// help text, and the notes.
-func (o *option) row() [3]string {
-	flags := noShort + o.label()
-	if o.short != 0 {
-		flags = shortPrefix + string(o.short) + ", " + o.label()
-	}
-	return [3]string{flags + o.placeholder(), o.help, o.notes()}
-}
-
-// notes returns the last column of the row of o in the help: whether o is required, and its
-// default, its environment variable and its config key. A secret option masks its default.
-func (o *option) notes() string {
-	var notes []string
-	if o.required {
-		notes = append(notes, "required")
-	}
-	if o.hasDef {
-		def := o.defText
-		if o.secret {
-			def = secretText
-		}
-		notes = append(notes, "default "+strconv.Quote(def))
-	}
-	if o.env != "" {
-		notes = append(notes, "env "+o.env)
-	}
-	if o.key != "" {
-		notes = append(notes, "key "+o.key)
-	}
-	return strings.Join(notes, ", ")
-}
-
 // placeholder returns the text after the flag of o in the help: nothing for a bool, the values of
-// an enum, and else the name of the type of its values, such as " string,..." for a list of strings.
+// an enum, and else the name of the type of its values, such as "string,..." for a list of strings.
 func (o *option) placeholder() string {
 	t := o.value.Type()
 	switch {
 	case t.Kind() == reflect.Bool:
 		return ""
 	case o.enum != nil:
-		return " " + strings.Join(o.enum, "|")
+		return strings.Join(o.enum, "|")
 	case o.shape == list:
-		return " " + typeName(t.Elem()) + listSeparator + ellipsis
+		return typeName(t.Elem()) + listSeparator + ellipsis
 	case o.shape == dict:
-		return " " + typeName(t.Key()) + entrySeparator + typeName(t.Elem()) + listSeparator + ellipsis
+		return typeName(t.Key()) + entrySeparator + typeName(t.Elem()) + listSeparator + ellipsis
 	default:
-		return " " + typeName(t)
+		return typeName(t)
 	}
 }
 

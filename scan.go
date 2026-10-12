@@ -87,9 +87,10 @@ func (in *input[G]) scan(d *declaration[G], args []string) error {
 					names[k] = b.cmd.name
 				}
 				return &Error{
-					Err:   ErrUnknownCommand,
-					Input: arg,
-					text:  "unknown command " + strconv.Quote(arg) + suggestion(arg, names, ""),
+					Err:        ErrUnknownCommand,
+					Input:      arg,
+					Suggestion: suggest(arg, names, ""),
+					text:       "unknown command " + strconv.Quote(arg),
 				}
 			}
 			in.cmd = d.commands[j]
@@ -114,9 +115,10 @@ func (in *input[G]) long(args []string, i int) (int, error) {
 			}
 		}
 		return i, &Error{
-			Err:   ErrUnknownFlag,
-			Input: flagPrefix + name,
-			text:  "unknown flag " + flagPrefix + name + suggestion(name, names, flagPrefix),
+			Err:        ErrUnknownFlag,
+			Input:      flagPrefix + name,
+			Suggestion: suggest(name, names, flagPrefix),
+			text:       "unknown flag " + flagPrefix + name,
 		}
 	}
 	o := in.list[j]
@@ -142,9 +144,10 @@ func (in *input[G]) cluster(args []string, i int) (int, error) {
 	longName := slices.ContainsFunc(in.list, func(o *option) bool { return !o.arg && o.name == text })
 	if longName && utf8.RuneCountInString(text) > 1 {
 		return i, &Error{
-			Err:   ErrUnknownFlag,
-			Input: args[i],
-			text:  "unknown flag " + args[i] + " (did you mean " + flagPrefix + text + "?)",
+			Err:        ErrUnknownFlag,
+			Input:      args[i],
+			Suggestion: flagPrefix + text,
+			text:       "unknown flag " + args[i],
 		}
 	}
 	for text != "" {

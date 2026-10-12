@@ -1,0 +1,203 @@
+// Copyright Stealth Scale B.V. 2026
+// SPDX-License-Identifier: MIT
+
+package cli
+
+import (
+	"fmt"
+	"io"
+	"slices"
+	"strings"
+)
+
+// Help contains the help of an app or of one of its commands for a [Renderer].
+type Help struct {
+	App     string // the name of the app
+	Command string // the name of the command, or empty for the help of the app
+	Text    string // the help text of the app or of the command
+	// Usage contains the parts of the usage line after the names, such as "[options]" and "[NAME]".
+	Usage []string
+	// Commands contains the commands of the app in the order of their registration. The help of a
+	// command does not list commands.
+	Commands []HelpCommand
+	// Arguments contains the positional arguments of the command in the order of their fields.
+	Arguments []HelpOption
+	// Options contains the options of the command in the order of their flags.
+	Options []HelpOption
+	// Globals contains the global options in the order of their flags. -h and --help are among them.
+	Globals []HelpOption
+}
+
+// HelpCommand is a command in the help of an app.
+type HelpCommand struct {
+	Name string // the name of the command, such as serve
+	Text string // the help text of the command
+}
+
+// HelpOption is an option or a positional argument in the help.
+type HelpOption struct {
+	Name        string // the flag such as --addr, or the label of an argument such as NAME
+	Short       string // the short flag such as -a, or empty
+	Placeholder string // the type or the values such as string or dev|prod, or empty for a bool
+	Text        string // the help text
+	Default     string // the default in quotes such as ":8080" or "***", or empty without one
+	Env         string // the environment variable, or empty
+	Key         string // the config key, or empty
+	Required    bool   // a run fails when no source sets the option
+}
+
+// DebugRow is a row of the table of --flag-debug.
+type DebugRow struct {
+	Option string // the flag, or the label of a positional argument
+	Value  string // the value as the table prints it, with *** for a secret option
+	Source Source // the source of the value
+}
+
+// Failure is the error of a run as [App.Main] writes it.
+type Failure struct {
+	Err        error  // the error of the run
+	App        string // the name of the app
+	Command    string // the command of the run, or empty
+	Message    string // the message without the names and the suggestion
+	Suggestion string // the name that the package suggests in place of the input, or empty
+	Usage      bool   // the error is an invalid command line, environment variable or config file
+}
+
+// Renderer writes the help, the message of a failure and the table of --flag-debug in place of the
+// package. environ is the environment of the run as KEY=value pairs, which [Env.Environ] returns.
+//
+// The package calls a Renderer on the goroutine of [App.Execute] or [App.Main], and returns the
+// error of Help and of Debug unchanged. Concurrent runs of one app share its Renderer, so a
+// Renderer must be safe for concurrent use.
+type Renderer interface {
+	// Help writes the help h to w.
+	Help(w io.Writer, environ []string, h *Help) error
+	// Error writes the failure f to w.
+	Error(w io.Writer, environ []string, f *Failure) error
+	// Debug writes the rows of the table of --flag-debug to w.
+	Debug(w io.Writer, environ []string, rows []DebugRow) error
+}
+
+// Plain is the [Renderer] of an app that registers none. It writes text without colors or styles
+// in the columns of the help. A Renderer can embed Plain to replace only some of its methods.
+type Plain struct{}
+
+// Help writes the usage line, the text and the sections of h to w.
+//
+// Error modes:
+//   - an error that wraps the error of w.
+func (Plain) Help(w io.Writer, _ []string, h *Help) error {
+	names := []string{h.App}
+	if h.Command != "" {
+		names = append(names, h.Command)
+	}
+	var b strings.Builder
+	b.WriteString("Usage: " + strings.Join(slices.Concat(names, h.Usage), " ") + "\n")
+	if h.Text != "" {
+		b.WriteString("\n" + h.Text + "\n")
+	}
+	commands := make([][3]string, len(h.Commands))
+	for i, c := range h.Commands {
+		commands[i] = [3]string{c.Name, c.Text}
+	}
+	writeSection(&b, "Commands", commands)
+	writeSection(&b, "Arguments", plainRows(h.Arguments))
+	writeSection(&b, "Options", plainRows(h.Options))
+	writeSection(&b, "Global options", plainRows(h.Globals))
+	if _, err := io.WriteString(w, b.String()); err != nil {
+		return fmt.Errorf("cli: write the help: %w", err)
+	}
+	return nil
+}
+
+// Error writes the name of the app, the command, the message and the suggestion of f to w on one
+// line.
+//
+// Error modes:
+//   - an error that wraps the error of w.
+func (Plain) Error(w io.Writer, _ []string, f *Failure) error {
+	if _, err := io.WriteString(w, f.App+": "+message(f.Command, f.Message, f.Suggestion)+"\n"); err != nil {
+		return fmt.Errorf("cli: write the failure: %w", err)
+	}
+	return nil
+}
+
+// Debug writes the option, the value and the source of each row to w in columns below a header.
+//
+// Error modes:
+//   - an error that wraps the error of w.
+func (Plain) Debug(w io.Writer, _ []string, rows []DebugRow) error {
+	table := make([][3]string, 0, len(rows)+1)
+	table = append(table, [3]string{"OPTION", "VALUE", "SOURCE"})
+	for _, r := range rows {
+		table = append(table, [3]string{r.Option, r.Value, r.Source.String()})
+	}
+	var b strings.Builder
+	writeRows(&b, table)
+	if _, err := io.WriteString(w, b.String()); err != nil {
+		return fmt.Errorf("cli: write the output of %s%s: %w", flagPrefix, debugFlag, err)
+	}
+	return nil
+}
+
+// Render registers r as the renderer of the output of the app. A later call replaces an earlier
+// one. An app without a call uses [Plain].
+//
+// [App.Execute] returns an error that wraps [ErrDeclaration] when r is nil.
+func (a *App[G]) Render(r Renderer) {
+	if r == nil {
+		a.errs = append(a.errs, fmt.Errorf("%w: the renderer is nil", ErrDeclaration))
+		return
+	}
+	a.renderer = r
+}
+
+// plainRows returns the rows of opts in the columns of the help: the flags with the placeholder,
+// the help text and the notes.
+func plainRows(opts []HelpOption) [][3]string {
+	rows := make([][3]string, len(opts))
+	for i := range opts {
+		o := &opts[i]
+		flags := noShort + o.Name
+		if o.Short != "" {
+			flags = o.Short + ", " + o.Name
+		}
+		if o.Placeholder != "" {
+			flags += " " + o.Placeholder
+		}
+		rows[i] = [3]string{flags, o.Text, notes(o)}
+	}
+	return rows
+}
+
+// notes returns the last column of the row of o in the help: whether o is required, and its
+// default, its environment variable and its config key.
+func notes(o *HelpOption) string {
+	var parts []string
+	if o.Required {
+		parts = append(parts, "required")
+	}
+	if o.Default != "" {
+		parts = append(parts, "default "+o.Default)
+	}
+	if o.Env != "" {
+		parts = append(parts, "env "+o.Env)
+	}
+	if o.Key != "" {
+		parts = append(parts, "key "+o.Key)
+	}
+	return strings.Join(parts, ", ")
+}
+
+// message returns text after the command and before the suggestion, such as
+// "serve: unknown flag --adr (did you mean --addr?)". It leaves out an empty command and an empty
+// suggestion.
+func message(command, text, suggestion string) string {
+	if command != "" {
+		text = command + ": " + text
+	}
+	if suggestion != "" {
+		text += " (did you mean " + suggestion + "?)"
+	}
+	return text
+}

@@ -150,6 +150,32 @@ func TestRun(t *testing.T) {
 		})
 	})
 
+	t.Run("Environ", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("returns the environment of the Env", func(t *testing.T) {
+			t.Parallel()
+			out := &bytes.Buffer{}
+			env := &cli.Env{Environ: cli.Environ(map[string]string{"TERM": "xterm"}), Stdout: out, Stderr: out}
+			run, err := cli.NewRun(&runGlobal{}, &runOptions{}, env)
+			assert.NoError(t, err, "NewRun returns a run")
+			assert.Equal(
+				t,
+				run.Environ(),
+				[]string{"TERM=xterm"},
+				"Environ returns the result of the Environ of the Env",
+			)
+		})
+
+		t.Run("returns nil for an Env without Environ", func(t *testing.T) {
+			t.Parallel()
+			out := &bytes.Buffer{}
+			run, err := cli.NewRun(&runGlobal{}, &runOptions{}, &cli.Env{Stdout: out, Stderr: out})
+			assert.NoError(t, err, "NewRun returns a run")
+			assert.Nil(t, run.Environ(), "Environ returns nil")
+		})
+	})
+
 	t.Run("Source", func(t *testing.T) {
 		t.Parallel()
 

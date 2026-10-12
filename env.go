@@ -8,13 +8,17 @@ import (
 	"io"
 	"maps"
 	"os"
+	"slices"
 )
 
 // Env is the process environment of a run: its arguments, its environment variables, its files and
 // its standard streams. A program passes [OS], and a test builds one.
 //
-// Stdout and Stderr are required. A nil Lookup does not report any environment variable. A nil
-// ReadFile does not read a file, as if no file existed. A nil Stdin reads as empty.
+// Stdout and Stderr are required. The package reads the environment variables of its options
+// through Lookup. Environ returns the environment as KEY=value pairs for a [Renderer] and for the
+// libraries that a handler calls. A nil Lookup does not report any environment variable, and
+// without Environ a Renderer and [Run.Environ] receive nil. A nil ReadFile does not read a file, as
+// if no file existed. A nil Stdin reads as empty.
 //
 // # Concurrency
 //
@@ -22,6 +26,7 @@ import (
 // share its functions and its streams.
 type Env struct {
 	Lookup   func(name string) (string, bool)  // reports the value of the environment variable name
+	Environ  func() []string                   // returns the environment as KEY=value pairs
 	ReadFile func(name string) ([]byte, error) // returns the content of the config file name
 	Stdin    io.Reader
 	Stdout   io.Writer
@@ -30,10 +35,11 @@ type Env struct {
 }
 
 // OS returns the Env of the current process: the arguments of os.Args after the name of the
-// program, os.LookupEnv, os.ReadFile and the standard streams of package os.
+// program, os.LookupEnv, os.Environ, os.ReadFile and the standard streams of package os.
 func OS() *Env {
 	return &Env{
 		Lookup:   os.LookupEnv,
+		Environ:  os.Environ,
 		ReadFile: os.ReadFile,
 		Stdin:    os.Stdin,
 		Stdout:   os.Stdout,
@@ -51,6 +57,18 @@ func Vars(vars map[string]string) func(name string) (string, bool) {
 	}
 }
 
+// Environ returns an Environ function that returns the variables of a copy of vars as KEY=value
+// pairs in the order of their names. Each call returns a list of its own.
+func Environ(vars map[string]string) func() []string {
+	pairs := make([]string, 0, len(vars))
+	for _, name := range slices.Sorted(maps.Keys(vars)) {
+		pairs = append(pairs, name+"="+vars[name])
+	}
+	return func() []string {
+		return slices.Clone(pairs)
+	}
+}
+
 // check returns an error that wraps ErrEnv when e is nil, or has no Stdout or no Stderr.
 func (e *Env) check() error {
 	switch {
@@ -63,6 +81,14 @@ func (e *Env) check() error {
 	default:
 		return nil
 	}
+}
+
+// environ returns the result of the Environ of e, or nil when e has no Environ.
+func (e *Env) environ() []string {
+	if e.Environ == nil {
+		return nil
+	}
+	return e.Environ()
 }
 
 // lookup returns the value of the environment variable name, and reports false when e has no
