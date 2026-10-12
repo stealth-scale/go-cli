@@ -127,6 +127,7 @@ linters:
           files:
             - "$all"
             - "!$test"
+            - "!**/charm/*.go"
             - "!**/toml/*.go"
             - "!**/yaml/*.go"
           allow:
@@ -143,10 +144,21 @@ linters:
             - github.com/BurntSushi/toml
             - go.stealthscale.io/cli
             - go.yaml.in/yaml/v3
+        charm:
+          list-mode: strict
+          files:
+            - "**/charm/*.go"
+            - "!$test"
+          allow:
+            - $gostd
+            - charm.land/lipgloss/v2
+            - github.com/charmbracelet/colorprofile
+            - go.stealthscale.io/cli
         test:
           list-mode: strict
           files:
             - "$test"
+            - "!**/charm/*_test.go"
             - "!**/toml/*_test.go"
             - "!**/yaml/*_test.go"
           allow:
@@ -164,6 +176,15 @@ linters:
             - go.dokimi.dev/assert
             - go.stealthscale.io/cli
             - go.yaml.in/yaml/v3
+        charm-tests:
+          list-mode: strict
+          files:
+            - "**/charm/*_test.go"
+          allow:
+            - $gostd
+            - charm.land/lipgloss/v2
+            - go.dokimi.dev/assert
+            - go.stealthscale.io/cli
     exhaustive:
       default-signifies-exhaustive: true
       check:
@@ -251,6 +272,9 @@ linters:
         - context\.Cause\(
         - (fs|filepath)\.WalkDir\(
         - filepath\.Walk\(
+        - \(go\.stealthscale\.io/cli\.Plain\)\.
+      ignore-interface-regexps:
+        - ^cli\.Renderer$
   exclusions:
     generated: lax
     presets:

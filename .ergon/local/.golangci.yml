@@ -6,9 +6,10 @@
 linters:
   settings:
     # The production code of the module go.stealthscale.io/cli imports only the standard library.
-    # The production code of a format module also imports the parser of its format. The tests of the
-    # cli module may also import go.dokimi.dev/assert, and the tests of a format module the parser of
-    # its format. golangci-lint reports any other import.
+    # The production code of a format module also imports the parser of its format, and the module
+    # charm imports Lip Gloss and colorprofile. The tests of the cli module may also import
+    # go.dokimi.dev/assert, and the tests of another module the libraries of its production code.
+    # golangci-lint reports any other import.
     depguard:
       rules:
         main:
@@ -16,6 +17,7 @@ linters:
           files:
             - "$all"
             - "!$test"
+            - "!**/charm/*.go"
             - "!**/toml/*.go"
             - "!**/yaml/*.go"
           allow:
@@ -32,10 +34,21 @@ linters:
             - github.com/BurntSushi/toml
             - go.stealthscale.io/cli
             - go.yaml.in/yaml/v3
+        charm:
+          list-mode: strict
+          files:
+            - "**/charm/*.go"
+            - "!$test"
+          allow:
+            - $gostd
+            - charm.land/lipgloss/v2
+            - github.com/charmbracelet/colorprofile
+            - go.stealthscale.io/cli
         test:
           list-mode: strict
           files:
             - "$test"
+            - "!**/charm/*_test.go"
             - "!**/toml/*_test.go"
             - "!**/yaml/*_test.go"
           allow:
@@ -53,6 +66,23 @@ linters:
             - go.dokimi.dev/assert
             - go.stealthscale.io/cli
             - go.yaml.in/yaml/v3
+        charm-tests:
+          list-mode: strict
+          files:
+            - "**/charm/*_test.go"
+          allow:
+            - $gostd
+            - charm.land/lipgloss/v2
+            - go.dokimi.dev/assert
+            - go.stealthscale.io/cli
+    # The package cli returns the error of a Renderer unchanged, as it returns the error of a
+    # handler unchanged. The renderer Plain wraps the errors of its writer itself, so a renderer
+    # that delegates to Plain returns those errors unchanged too.
+    wrapcheck:
+      ignore-interface-regexps:
+        - ^cli\.Renderer$
+      ignore-sig-regexps:
+        - \(go\.stealthscale\.io/cli\.Plain\)\.
 
 formatters:
   settings:
