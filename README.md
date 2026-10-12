@@ -263,6 +263,49 @@ Global options:
 Flags can come between the arguments. `pack add logs app.log -l 9 db.log` sets `Files` to `app.log`
 and `db.log`.
 
+## Input files
+
+An option of the type `cli.InputFile` is the path of a file that a command reads. The path `-` is
+the standard input. `Run.Open` opens the file of such an option, so one handler reads a file, a
+`-` and a pipe:
+
+```go
+type Parse struct {
+	Doc cli.InputFile `help:"JSON document, or - for the standard input." arg:"" default:"-"`
+}
+
+func parse(_ context.Context, run *cli.Run[Global, Parse]) (err error) {
+	f, err := run.Open(run.Config().Doc)
+	if err != nil {
+		return fmt.Errorf("main: parse: %w", err)
+	}
+	defer func() { err = errors.Join(err, f.Close()) }()
+	var v map[string]any
+	if err = json.NewDecoder(f).Decode(&v); err != nil {
+		return fmt.Errorf("main: parse %s: %w", run.Config().Doc, err)
+	}
+	_, err = fmt.Fprintln(run.Stdout(), v["name"])
+	return err
+}
+```
+
+```console
+$ cat test.json | tool parse
+store
+$ tool parse test.json
+store
+$ tool parse missing.json
+tool: main: parse: open missing.json: no such file or directory
+```
+
+The package does not open an input file while it reads the command line. A handler opens each
+file of a slice such as `[]cli.InputFile` and closes it before the next, so a long list keeps one
+file open at a time. The help shows the value of an input file as `file`. The command `add` of the
+example [`04-arguments`](examples/04-arguments) reads its files this way.
+
+`Run.Open` opens a file through `Env.Open`. `cli.OS` opens the files of the process, and a test
+gives a run its files through `Env.Open`, as the section Testing shows.
+
 ## Groups
 
 A named struct field is a group. The name of the group starts the flag, the variable and the key of
@@ -490,8 +533,11 @@ a.Render(charm.New(&t))
 ```
 
 A renderer of your own implements the three methods of `cli.Renderer`. It can embed `cli.Plain` to
-replace only some of them. `Run.Environ` returns the environment of a run to its handler, so the
-handler can pass the variables of its `Env` to a terminal library such as Bubble Tea.
+replace only some of them. The renderer of the example [`15-renderer`](examples/15-renderer)
+writes the help, the failures and the rows of `--flag-debug` as JSON when the environment contains
+`OUTPUT=json`, and the text of `cli.Plain` otherwise. `Run.Environ` returns the environment of a run
+to its handler, so the handler can pass the variables of its `Env` to a terminal library such as
+Bubble Tea.
 
 ## Testing
 
@@ -514,13 +560,13 @@ func TestServe(t *testing.T) {
 }
 ```
 
-A run reads only the arguments, the environment variables, the config files and the standard input
-of its `Input`. A config file outside `Input.Files` does not exist for the run, so the result does
-not depend on the files of the machine. `os.DirFS("testdata")` gives a run the files of a
-directory. Tests that call `clitest` can run in parallel.
+A run reads only the arguments, the environment variables, the files and the standard input of its
+`Input`. A config file or an input file outside `Input.Files` does not exist for the run, so the
+result does not depend on the files of the machine. `os.DirFS("testdata")` gives a run the files of
+a directory. Tests that call `clitest` can run in parallel.
 
 `clitest.Transcript` runs a list of command lines and returns the runs as a terminal shows them,
-with the config files that each run read. A test compares the transcript with a golden file, such as
+with the files that each run opened. A test compares the transcript with a golden file, such as
 with the package `golden` of `go.dokimi.dev/assert`:
 
 ```go
@@ -544,6 +590,8 @@ output fail, so a test can check the error paths of a handler. The examples test
 `clitest`.
 
 An `Env` of your own builds `Lookup` and `Environ` from one map with `cli.Vars` and `cli.Environ`.
+Its `Open` has the signature of `fs.FS.Open`, so the `Open` method of a file system such as
+`fstest.MapFS` gives a run its files.
 `App.Execute` and `App.Main` are safe for concurrent use once the registrations have returned, so
 parallel tests can share one app.
 
@@ -558,8 +606,7 @@ parallel tests can share one app.
 
 ## Examples
 
-[`examples/`](examples) contains 14 runnable programs. Their numbers follow the order of the sections
-of this README, from `01-quickstart` to `14-testing`. The test of each example compares its output
+[`examples/`](examples) contains 15 runnable programs. The test of each example compares its output
 with a golden transcript. [examples/README.md](examples/README.md) lists what each example shows.
 
 ## Development
