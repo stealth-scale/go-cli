@@ -10,3 +10,11 @@ use (
 	./toml
 	./yaml
 )
+
+replace go.stealthscale.io/cli v0.1.0 => ./
+
+replace go.stealthscale.io/cli/charm v0.1.0 => ./charm
+
+replace go.stealthscale.io/cli/toml v0.1.0 => ./toml
+
+replace go.stealthscale.io/cli/yaml v0.1.0 => ./yaml

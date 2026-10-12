@@ -9,7 +9,7 @@ require (
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/charmbracelet/colorprofile v0.4.3
 	go.dokimi.dev/assert v0.2.0
-	go.stealthscale.io/cli v0.0.0-00010101000000-000000000000
+	go.stealthscale.io/cli v0.1.0
 )
 
 require (

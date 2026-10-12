@@ -7,10 +7,10 @@ go 1.27.2
 
 require (
 	go.dokimi.dev/assert v0.2.0
-	go.stealthscale.io/cli v0.0.0-00010101000000-000000000000
-	go.stealthscale.io/cli/charm v0.0.0-00010101000000-000000000000
-	go.stealthscale.io/cli/toml v0.0.0-00010101000000-000000000000
-	go.stealthscale.io/cli/yaml v0.0.0-00010101000000-000000000000
+	go.stealthscale.io/cli v0.1.0
+	go.stealthscale.io/cli/charm v0.1.0
+	go.stealthscale.io/cli/toml v0.1.0
+	go.stealthscale.io/cli/yaml v0.1.0
 )
 
 require (
