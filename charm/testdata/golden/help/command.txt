@@ -1,0 +1,23 @@
+Run the server of the store.
+
+USAGE
+  srv serve [options] [NAME]
+
+ARGUMENTS
+  NAME                Name of the store.
+                      default "main"
+
+OPTIONS
+  -a, --addr string   Address to listen on.
+                      default ":8080" · env SRV_SERVE_ADDR · key serve.addr
+      --client-certificate-authority file
+                      Certificate authority of the clients. The server checks
+                      the certificate of each client against it.
+                      env SRV_SERVE_CLIENT_CERTIFICATE_AUTHORITY
+                      key serve.client-certificate-authority
+  -q, --quiet
+      --token string  Bearer token of the requests.
+                      required · default "***" · env SRV_TOKEN
+
+GLOBAL OPTIONS
+  -h, --help          Show the help.

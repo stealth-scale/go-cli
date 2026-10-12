@@ -1,0 +1,3 @@
+[41m [m[1;97;41mERROR[m[41m [m unknown command "serv"
+        [2mDid you mean [m[1;32mserve[m[2m?[m
+        [2mRun [m[1msrv --help[m[2m for the usage.[m

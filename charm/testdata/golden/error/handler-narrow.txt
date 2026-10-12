@@ -1,0 +1,2 @@
+[41m [m[1;97;41mERROR[m[41m [m open /var/lib/srv/store.db: the file is
+        locked by another process of the server

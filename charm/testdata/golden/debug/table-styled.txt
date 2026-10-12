@@ -1,0 +1,4 @@
+  [1mOPTION[m    [1mVALUE[m       [1mSOURCE[m
+  [35m--config[m  "srv.json"  [2mdefault[m
+  [35m--addr[m    ":9000"     [2mkey serve.addr of srv.json[m
+  [35m--token[m   ***         [2menv SRV_TOKEN[m

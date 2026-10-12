@@ -1,0 +1,1 @@
+[41m [m[1;97;41mERROR[m[41m [m main: the store is down

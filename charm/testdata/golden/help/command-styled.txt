@@ -1,0 +1,23 @@
+Run the server of the store.
+
+[1mUSAGE[m
+  [1msrv[m [36mserve[m [2m[options][m [2m[NAME][m
+
+[1mARGUMENTS[m
+  [35mNAME[m                Name of the store.
+                      [2mdefault "main"[m
+
+[1mOPTIONS[m
+  [35m-a[m, [35m--addr[m [2mstring[m   Address to listen on.
+                      [2mdefault ":8080"[m[2m · [m[2menv SRV_SERVE_ADDR[m[2m · [m[2mkey serve.addr[m
+      [35m--client-certificate-authority[m [2mfile[m
+                      Certificate authority of the clients. The server checks
+                      the certificate of each client against it.
+                      [2menv SRV_SERVE_CLIENT_CERTIFICATE_AUTHORITY[m
+                      [2mkey serve.client-certificate-authority[m
+  [35m-q[m, [35m--quiet[m
+      [35m--token[m [2mstring[m  Bearer token of the requests.
+                      [33mrequired[m[2m · [m[2mdefault "***"[m[2m · [m[2menv SRV_TOKEN[m
+
+[1mGLOBAL OPTIONS[m
+  [35m-h[m, [35m--help[m          Show the help.
