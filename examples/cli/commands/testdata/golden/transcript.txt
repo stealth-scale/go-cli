@@ -1,0 +1,71 @@
+$ deploy --help
+Usage: deploy [global options] <command> [options]
+
+Deploy the service.
+
+Commands:
+  plan      Print the changes of a deployment.
+  apply     Apply the changes of a deployment.
+  rollback  Roll back to an earlier release.
+
+Global options:
+      --flag-debug  Print the value and the source of each option before the command runs.  env DEPLOY_FLAG_DEBUG
+  -h, --help        Show the help.
+  -v, --verbose     Print each step.                                                        env DEPLOY_VERBOSE, key verbose
+[exit 0]
+
+$ deploy plan --env prod
+plan: 2 changes
+[exit 0]
+
+$ deploy -v apply -e prod -y
+apply: target prod in eu-west-1
+apply: 2 changes applied
+[exit 0]
+
+$ deploy apply -e prod -y --verbose
+apply: target prod in eu-west-1
+apply: 2 changes applied
+[exit 0]
+
+$ deploy apply -e prod
+deploy: main: apply changes prod only with --yes
+[exit 1]
+
+$ deploy rollback -e dev --region us-east-1 41
+rollback: release 41 restored
+[exit 0]
+
+$ deploy plan
+deploy: plan: missing --env
+[exit 2]
+
+$ deploy plan --env staging
+deploy: plan: invalid --env "staging" from flag --env: want dev or prod
+[exit 2]
+
+$ deploy aply -e dev
+deploy: unknown command "aply" (did you mean apply?)
+[exit 2]
+
+$ deploy rollback --help
+Usage: deploy rollback [options] RELEASE
+
+Roll back to an earlier release.
+
+Arguments:
+      RELEASE  Release to roll back to.
+
+Options:
+  -e, --env dev|prod   Environment to act on.      required, env DEPLOY_ROLLBACK_ENV, key rollback.env
+      --region string  Region of the environment.  default "eu-west-1", env DEPLOY_ROLLBACK_REGION, key rollback.region
+
+Global options:
+      --flag-debug  Print the value and the source of each option before the command runs.  env DEPLOY_FLAG_DEBUG
+  -h, --help        Show the help.
+  -v, --verbose     Print each step.                                                        env DEPLOY_VERBOSE, key verbose
+[exit 0]
+
+$ deploy plan -e dev >/dev/full
+deploy: main: write the result of plan: transcript: no space left on device
+[exit 1]

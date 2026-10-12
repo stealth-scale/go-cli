@@ -1,0 +1,7 @@
+{
+  "get": {
+    "retries": 5,
+    "timeout": "20s",
+    "token": "from-the-file"
+  }
+}

@@ -1,0 +1,126 @@
+$ types show --help
+Usage: types show [options]
+
+Print the value of each option.
+
+Options:
+      --addr addr              A netip.Addr.                             env TYPES_SHOW_ADDR, key show.addr
+      --enabled                A bool.                                   env TYPES_SHOW_ENABLED, key show.enabled
+      --level int8             An int8.                                  env TYPES_SHOW_LEVEL, key show.level
+      --limits string=int,...  A map of entries of the form key=value.   env TYPES_SHOW_LIMITS, key show.limits
+      --log level              A slog.Level, such as debug or warn.      env TYPES_SHOW_LOG, key show.log
+      --mirror url             A url.URL.                                env TYPES_SHOW_MIRROR, key show.mirror
+      --mode filemode          An fs.FileMode in octal, such as 0640.    env TYPES_SHOW_MODE, key show.mode
+      --name string            A string.                                 env TYPES_SHOW_NAME, key show.name
+      --network ipnet          A net.IPNet in CIDR notation.             env TYPES_SHOW_NETWORK, key show.network
+      --peer ipnet             A *net.IPNet in CIDR notation.            env TYPES_SHOW_PEER, key show.peer
+      --port uint16            A uint16.                                 env TYPES_SHOW_PORT, key show.port
+      --ports uint16,...       A slice of uint16.                        env TYPES_SHOW_PORTS, key show.ports
+      --ratio float64          A float64.                                env TYPES_SHOW_RATIO, key show.ratio
+      --since time             A time.Time in RFC 3339.                  env TYPES_SHOW_SINCE, key show.since
+      --tags string,...        A slice of strings that commas separate.  env TYPES_SHOW_TAGS, key show.tags
+      --timeout duration       A time.Duration, such as 1m30s.           env TYPES_SHOW_TIMEOUT, key show.timeout
+      --upstream url           A *url.URL.                               env TYPES_SHOW_UPSTREAM, key show.upstream
+      --workers int            A *int, nil until a source sets it.       env TYPES_SHOW_WORKERS, key show.workers
+      --zone location          A *time.Location of the zone database.    env TYPES_SHOW_ZONE, key show.zone
+
+Global options:
+      --flag-debug  Print the value and the source of each option before the command runs.  env TYPES_FLAG_DEBUG
+  -h, --help        Show the help.
+[exit 0]
+
+$ types show
+name     ""
+enabled  false
+level    0
+port     0
+ratio    0
+timeout  0s
+since    0001-01-01T00:00:00Z
+addr     invalid IP
+log      INFO
+upstream <nil>
+mirror   ""
+zone     <nil>
+network  <nil>
+peer     <nil>
+mode     ---------- (0)
+workers  <nil>
+tags     []
+ports    []
+limits   map[]
+[exit 0]
+
+$ types show --name Ada --enabled --level -8 --port 8080 --ratio 0.25 --timeout 1m30s --since 2026-10-12T09:30:00Z --addr 10.0.0.1 --log warn --upstream https://api.example.com/v1 --mirror https://mirror.example.com --zone Europe/Amsterdam --network 10.0.0.0/8 --peer 192.168.0.0/16 --mode 0640 --workers 4 --tags a,b --ports 80,443 --limits cpu=2,mem=8 --limits disk=100
+name     "Ada"
+enabled  true
+level    -8
+port     8080
+ratio    0.25
+timeout  1m30s
+since    2026-10-12T09:30:00Z
+addr     10.0.0.1
+log      WARN
+upstream https://api.example.com/v1
+mirror   "https://mirror.example.com"
+zone     Europe/Amsterdam
+network  10.0.0.0/8
+peer     192.168.0.0/16
+mode     -rw-r----- (0640)
+workers  4
+tags     ["a" "b"]
+ports    [80 443]
+limits   map[cpu:2 disk:100 mem:8]
+[exit 0]
+
+$ types show --port 70000
+types: show: invalid --port "70000" from flag --port: value out of range
+[exit 2]
+
+$ types show --level 1.5
+types: show: invalid --level "1.5" from flag --level: invalid syntax
+[exit 2]
+
+$ types show --enabled=maybe
+types: show: invalid --enabled "maybe" from flag --enabled: invalid syntax
+[exit 2]
+
+$ types show --timeout 90
+types: show: invalid --timeout "90" from flag --timeout: time: missing unit in duration "90"
+[exit 2]
+
+$ types show --since yesterday
+types: show: invalid --since "yesterday" from flag --since: parsing time "yesterday" as "2006-01-02T15:04:05Z07:00": cannot parse "yesterday" as "2006"
+[exit 2]
+
+$ types show --addr 10.0.0
+types: show: invalid --addr "10.0.0" from flag --addr: ParseAddr("10.0.0"): IPv4 address too short
+[exit 2]
+
+$ types show --log loud
+types: show: invalid --log "loud" from flag --log: slog: level string "loud": unknown name
+[exit 2]
+
+$ types show --upstream %zz
+types: show: invalid --upstream "%zz" from flag --upstream: parse "%zz": invalid URL escape "%zz"
+[exit 2]
+
+$ types show --zone Mars/Base
+types: show: invalid --zone "Mars/Base" from flag --zone: unknown time zone Mars/Base
+[exit 2]
+
+$ types show --network 10.0.0.0/33
+types: show: invalid --network "10.0.0.0/33" from flag --network: invalid CIDR address: 10.0.0.0/33
+[exit 2]
+
+$ types show --mode 0999
+types: show: invalid --mode "0999" from flag --mode: invalid syntax
+[exit 2]
+
+$ types show --limits cpu
+types: show: invalid --limits "cpu" from flag --limits: want key=value
+[exit 2]
+
+$ types show >/dev/full
+types: main: write the options: transcript: no space left on device
+[exit 1]

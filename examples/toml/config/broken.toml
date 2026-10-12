@@ -1,0 +1,7 @@
+# Copyright Stealth Scale B.V. 2026
+# SPDX-License-Identifier: MIT
+
+# The run fails because the duration every does not have a unit.
+
+[backup]
+every = 12

@@ -1,0 +1,6 @@
+# Copyright Stealth Scale B.V. 2026
+# SPDX-License-Identifier: MIT
+
+# The run fails because the top level of this file is a sequence and not a mapping.
+
+- send

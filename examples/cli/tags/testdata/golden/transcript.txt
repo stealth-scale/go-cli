@@ -1,0 +1,57 @@
+$ backup run --help
+Usage: backup run [options]
+
+Write an archive of the store to a bucket.
+
+Options:
+      --bucket string               Bucket that receives the archive.  required, env BACKUP_RUN_BUCKET, key run.bucket
+  -z, --compression none|gzip|zstd  Compression of the archive.        default "zstd", env BACKUP_RUN_COMPRESSION, key run.compression
+  -n, --dry-run                     Print the plan without a backup.   env BACKUP_RUN_DRY_RUN, key run.dry-run
+      --endpoint string             Endpoint of the object store.      default "https://s3.example.com", env BACKUP_RUN_ENDPOINT, key storage.endpoint
+      --retain int                  Number of archives to keep.        default "7", env BACKUP_RUN_RETAIN, key run.retain
+      --schedule string             Cron schedule of the next backup.
+      --token string                Access token of the bucket.        env BACKUP_TOKEN, key run.token
+
+Global options:
+      --flag-debug  Print the value and the source of each option before the command runs.  env BACKUP_FLAG_DEBUG
+  -h, --help        Show the help.
+[exit 0]
+
+$ backup run
+backup: run: missing --bucket
+[exit 2]
+
+$ backup run --bucket nightly
+archive nightly with zstd, keep 7, endpoint https://s3.example.com
+[exit 0]
+
+$ backup run --bucket nightly --retain 3 -z gzip -n
+archive nightly with gzip, keep 3, endpoint https://s3.example.com
+dry run: nothing written
+[exit 0]
+
+$ backup run --bucket nightly --schedule '0 3 * * *'
+archive nightly with zstd, keep 7, endpoint https://s3.example.com
+schedule the next backup at "0 3 * * *"
+[exit 0]
+
+$ BACKUP_RUN_RETAIN=14 BACKUP_TOKEN=s3cret backup run --bucket nightly --flag-debug
+  OPTION         VALUE                     SOURCE
+  --bucket       "nightly"                 flag --bucket
+  --compression  "zstd"                    default
+  --dry-run      false                     default
+  --endpoint     "https://s3.example.com"  default
+  --retain       14                        env BACKUP_RUN_RETAIN
+  --schedule     ""                        default
+  --token        ***                       env BACKUP_TOKEN
+archive nightly with zstd, keep 14, endpoint https://s3.example.com
+authenticate with the token
+[exit 0]
+
+$ backup run --bucket nightly -z rar
+backup: run: invalid --compression "rar" from flag --compression: want none, gzip or zstd
+[exit 2]
+
+$ backup run --bucket nightly >/dev/full
+backup: main: write the plan: transcript: no space left on device
+[exit 1]

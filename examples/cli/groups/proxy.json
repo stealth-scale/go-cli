@@ -1,0 +1,11 @@
+{
+  "serve": {
+    "level": "warn",
+    "admin": {
+      "addr": "127.0.0.1:9443",
+      "tls": {"cert": "admin.pem", "key": "admin.key"}
+    },
+    "backend": {"url": "http://10.0.0.7:9000"},
+    "cache": {"size": 128}
+  }
+}

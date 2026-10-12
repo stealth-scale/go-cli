@@ -1,0 +1,8 @@
+# Copyright Stealth Scale B.V. 2026
+# SPDX-License-Identifier: MIT
+
+# yaml.Register also registers the extension .yml.
+
+send:
+  channels:
+    - pager

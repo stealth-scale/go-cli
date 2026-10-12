@@ -1,0 +1,76 @@
+$ pack create --help
+Usage: pack create [options] NAME [COMMENT]
+
+Create an archive.
+
+Arguments:
+      NAME     Name of the archive.
+      COMMENT  Comment of the archive.  default "none"
+
+Global options:
+      --flag-debug  Print the value and the source of each option before the command runs.  env PACK_FLAG_DEBUG
+  -h, --help        Show the help.
+[exit 0]
+
+$ pack add --help
+Usage: pack add [options] ARCHIVE FILES...
+
+Add files to an archive.
+
+Arguments:
+      ARCHIVE  Archive that receives the files.
+      FILES    Files to add, or - for the standard input.
+
+Options:
+  -l, --level int  Level of the compression.  default "6", env PACK_ADD_LEVEL, key add.level
+
+Global options:
+      --flag-debug  Print the value and the source of each option before the command runs.  env PACK_FLAG_DEBUG
+  -h, --help        Show the help.
+[exit 0]
+
+$ pack create logs
+create "logs" with the comment "none"
+[exit 0]
+
+$ pack create logs 'rotated daily'
+create "logs" with the comment "rotated daily"
+[exit 0]
+
+$ pack create
+pack: create: missing argument NAME
+[exit 2]
+
+$ pack create logs daily extra
+pack: create: unexpected argument "extra"
+[exit 2]
+
+$ pack add logs app.log -l 9 db.log
+add "app.log" to "logs" at level 9
+add "db.log" to "logs" at level 9
+[exit 0]
+
+$ pack add logs
+pack: add: missing argument FILES
+[exit 2]
+
+$ pack add logs -- -odd.log --level
+add "-odd.log" to "logs" at level 6
+add "--level" to "logs" at level 6
+[exit 0]
+
+$ pack add logs -
+add "-" to "logs" at level 6
+[exit 0]
+
+$ pack list
+list every file
+[exit 0]
+
+$ pack list '*.log' 'app-*'
+list the files that match ["*.log" "app-*"]
+[exit 0]
+
+$ pack create logs >/dev/full
+pack: main: write the result: transcript: no space left on device
+[exit 1]

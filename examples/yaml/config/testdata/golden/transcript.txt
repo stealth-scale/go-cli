@@ -1,0 +1,32 @@
+$ notify send
+send to ["email" "chat"] through smtp.example.com:587, every 15m0s, retries 3
+code 404: page not found
+code 500: server error
+[exit 0]
+
+$ notify -c notify.yml send
+send to ["pager"] through localhost:25, every 5m0s, retries 1
+[exit 0]
+
+$ notify send --flag-debug
+  OPTION       VALUE                                         SOURCE
+  --config     "notify.yaml"                                 default
+  --channels   ["email" "chat"]                              key send.channels of notify.yaml
+  --code       map[404:"page not found" 500:"server error"]  key send.code of notify.yaml
+  --retries    3                                             key send.retries of notify.yaml
+  --smtp-host  "smtp.example.com"                            key send.smtp.host of notify.yaml
+  --smtp-port  587                                           key send.smtp.port of notify.yaml
+  --window     15m0s                                         key send.window of notify.yaml
+send to ["email" "chat"] through smtp.example.com:587, every 15m0s, retries 3
+code 404: page not found
+code 500: server error
+[exit 0]
+
+$ notify -c broken.yaml send
+notify: send: config file broken.yaml: yaml: decode: yaml: unmarshal errors:
+  line 6: cannot unmarshal !!seq into map[string]interface {}
+[exit 2]
+
+$ notify send >/dev/full
+notify: main: write the options: transcript: no space left on device
+[exit 1]

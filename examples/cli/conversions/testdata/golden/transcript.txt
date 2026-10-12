@@ -1,0 +1,71 @@
+$ units check --help
+Usage: units check [options]
+
+Print the options and compare each size with the largest size.
+
+Options:
+      --max bytesize        Largest size of an upload.               default "1MB", env UNITS_CHECK_MAX, key check.max
+      --origin point        Origin of the grid.                      default "0,0", env UNITS_CHECK_ORIGIN, key check.origin
+      --sizes bytesize,...  Sizes to compare with the largest size.  env UNITS_CHECK_SIZES, key check.sizes
+      --target celsius      Target temperature.                      default "21C", env UNITS_CHECK_TARGET, key check.target
+      --version version     Lowest version of a client.              default "v1.0.0", env UNITS_CHECK_VERSION, key check.version
+      --webhook url         Webhook of the alerts.                   env UNITS_CHECK_WEBHOOK, key check.webhook
+
+Global options:
+      --flag-debug  Print the value and the source of each option before the command runs.  env UNITS_FLAG_DEBUG
+  -h, --help        Show the help.
+[exit 0]
+
+$ units check
+max 1048576B, version v1.0.0, target 21C, origin 0,0, webhook <nil>
+[exit 0]
+
+$ units check --max 64KB --sizes 512B,1MB --version v2.3.4 --target 19.5C --origin 3,4 --webhook https://hooks.example.com/alerts
+max 65536B, version v2.3.4, target 19.5C, origin 3,4, webhook https://hooks.example.com/alerts
+size 512B fits
+size 1048576B is too large
+[exit 0]
+
+$ units check --max 5TB
+units: check: invalid --max "5TB" from flag --max: main: want a whole number with the unit B, KB, MB or GB
+[exit 2]
+
+$ units check --max 1.5MB
+units: check: invalid --max "1.5MB" from flag --max: main: want a whole number with the unit B, KB, MB or GB
+[exit 2]
+
+$ units check --max 5
+units: check: invalid --max "5" from flag --max: main: want a whole number with the unit B, KB, MB or GB
+[exit 2]
+
+$ units check --version 2.0
+units: check: invalid --version "2.0" from flag --version: main: want a version of the form v1.2.3
+[exit 2]
+
+$ units check --version v1.x.3
+units: check: invalid --version "v1.x.3" from flag --version: main: want a version of the form v1.2.3
+[exit 2]
+
+$ units check --target 70F
+units: check: invalid --target "70F" from flag --target: main: want a number with the unit C
+[exit 2]
+
+$ units check --target warmC
+units: check: invalid --target "warmC" from flag --target: main: want a number with the unit C
+[exit 2]
+
+$ units check --origin 3
+units: check: invalid --origin "3" from flag --origin: main: want two whole numbers of the form x,y
+[exit 2]
+
+$ units check --webhook http://hooks.example.com/alerts
+units: check: invalid --webhook "http://hooks.example.com/alerts" from flag --webhook: main: want a URL with the scheme https
+[exit 2]
+
+$ units check --webhook %zz
+units: check: invalid --webhook "%zz" from flag --webhook: main: parse the URL: parse "%zz": invalid URL escape "%zz"
+[exit 2]
+
+$ units check >/dev/full
+units: main: write the check: transcript: no space left on device
+[exit 1]

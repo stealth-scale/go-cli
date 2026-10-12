@@ -1,0 +1,58 @@
+$ relay serve --help
+Usage: relay serve [options]
+
+Print the options of the server.
+
+Options:
+      --addr string              Address to listen on.      default ":8080", env RELAY_SERVE_ADDR, key serve.addr
+      --allow string,...         Origins that may connect.  env RELAY_SERVE_ALLOW, key serve.allow
+      --route string=string,...  Upstream of each path.     env RELAY_SERVE_ROUTE, key serve.route
+      --tls-cert string          Certificate file.          env RELAY_SERVE_TLS_CERT, key serve.tls.cert
+      --url string               URL of the database.       default "postgres://localhost/relay", env RELAY_SERVE_URL, key database.url
+
+Global options:
+  -c, --config file  Config file in JSON or INI.                                             default "relay.json", env RELAY_CONFIG
+      --flag-debug   Print the value and the source of each option before the command runs.  env RELAY_FLAG_DEBUG
+  -h, --help         Show the help.
+[exit 0]
+
+$ relay serve
+listen on :9000 with "relay.pem"
+database postgres://db.internal/relay
+allow ["https://app.example.com" "https://admin.example.com"]
+route /api to http://api:8080
+route /static to http://cdn:8080
+[exit 0]
+
+$ relay migrate
+migrate postgres://db.internal/relay, steps 3
+[exit 0]
+
+$ relay -c relay.ini serve
+listen on :9001 with "relay ini.pem"
+database postgres://db.internal/relay
+allow ["https://app.example.com" "https://admin.example.com"]
+route /api to http://api:8080
+[exit 0]
+
+$ relay -c relay.conf serve
+listen on :9002 with ""
+database postgres://localhost/relay
+allow []
+[exit 0]
+
+$ RELAY_CONFIG=relay.ini relay migrate --steps 1
+migrate postgres://db.internal/relay, steps 1
+[exit 0]
+
+$ relay -c typo.json serve
+relay: serve: unknown key serve.adr in typo.json (did you mean serve.addr?)
+[exit 2]
+
+$ relay serve >/dev/full
+relay: main: write the options of the server: transcript: no space left on device
+[exit 1]
+
+$ relay migrate >/dev/full
+relay: main: write the options of the migration: transcript: no space left on device
+[exit 1]

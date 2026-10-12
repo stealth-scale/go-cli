@@ -1,0 +1,10 @@
+{
+  "database": {"url": "postgres://db.internal/relay"},
+  "serve": {
+    "addr": ":9000",
+    "allow": ["https://app.example.com", "https://admin.example.com"],
+    "route": {"/api": "http://api:8080", "/static": "http://cdn:8080"},
+    "tls": {"cert": "relay.pem"}
+  },
+  "migrate": {"steps": 3}
+}

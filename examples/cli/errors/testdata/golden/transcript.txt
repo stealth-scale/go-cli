@@ -1,0 +1,42 @@
+$ lint run --strict src/main.go src/util.go
+src/main.go: 0 issues of at most 10, in text
+src/util.go: 0 issues of at most 10, in text
+[exit 0]
+
+$ lint run --strict legacy/old.go
+lint: main: a strict run refuses the files of legacy/
+[exit 1]
+
+$ lint rn src
+lint: cli: unknown command "rn" (did you mean run?)
+hint: lint --help lists the commands
+[exit 2]
+
+$ lint run --strikt src
+lint: cli: run: unknown flag --strikt (did you mean --strict?)
+hint: lint run --help lists the flags of the command
+[exit 2]
+
+$ lint run
+lint: cli: run: missing argument PATHS
+hint: the command needs PATHS
+[exit 2]
+
+$ lint run --max-issues many src
+lint: cli: run: invalid --max-issues "many" from flag --max-issues: invalid syntax
+hint: the value "many" of --max-issues comes from flag --max-issues
+[exit 2]
+
+$ LINT_RUN_FORMAT=xml lint run src
+lint: cli: run: invalid --format "xml" from env LINT_RUN_FORMAT: want text or json
+hint: the value "xml" of --format comes from env LINT_RUN_FORMAT
+[exit 2]
+
+$ lint -c lint.json run src
+lint: cli: run: unknown key run.max-issue in lint.json (did you mean run.max-issues?)
+hint: lint --help lists the options
+[exit 2]
+
+$ lint run src >/dev/full
+lint: main: write the report: transcript: no space left on device
+[exit 1]

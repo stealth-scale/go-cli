@@ -1,0 +1,65 @@
+$ fetch get
+url      https://example.com  default
+agent    fetch/1.0            default
+token    set                  key get.token of fetch.json
+timeout  20s                  key get.timeout of fetch.json
+retries  5                    key get.retries of fetch.json
+[exit 0]
+
+$ FETCH_GET_TIMEOUT=1m fetch get
+url      https://example.com  default
+agent    fetch/1.0            default
+token    set                  key get.token of fetch.json
+timeout  1m0s                 env FETCH_GET_TIMEOUT
+retries  5                    key get.retries of fetch.json
+[exit 0]
+
+$ FETCH_GET_TIMEOUT=1m fetch get --timeout 2m
+url      https://example.com  default
+agent    fetch/1.0            default
+token    set                  key get.token of fetch.json
+timeout  2m0s                 flag --timeout
+retries  5                    key get.retries of fetch.json
+[exit 0]
+
+$ FETCH_CONFIG='' fetch get
+url      https://example.com  default
+agent    fetch/1.0            default
+token    unset                default
+timeout  10s                  default
+retries  3                    default
+[exit 0]
+
+$ fetch get --flag-debug --agent curl/8.10
+  OPTION     VALUE                  SOURCE
+  --config   "fetch.json"           default
+  --agent    "curl/8.10"            flag --agent
+  --retries  5                      key get.retries of fetch.json
+  --timeout  20s                    key get.timeout of fetch.json
+  --token    ***                    key get.token of fetch.json
+  --url      "https://example.com"  default
+url      https://example.com  default
+agent    curl/8.10            flag --agent
+token    set                  key get.token of fetch.json
+timeout  20s                  key get.timeout of fetch.json
+retries  5                    key get.retries of fetch.json
+[exit 0]
+
+$ FETCH_FLAG_DEBUG=true fetch get --retries 0
+  OPTION     VALUE                  SOURCE
+  --config   "fetch.json"           default
+  --agent    "fetch/1.0"            default
+  --retries  0                      flag --retries
+  --timeout  20s                    key get.timeout of fetch.json
+  --token    ***                    key get.token of fetch.json
+  --url      "https://example.com"  default
+url      https://example.com  default
+agent    fetch/1.0            default
+token    set                  key get.token of fetch.json
+timeout  20s                  key get.timeout of fetch.json
+retries  0                    flag --retries
+[exit 0]
+
+$ fetch get >/dev/full
+fetch: main: write the options: transcript: no space left on device
+[exit 1]

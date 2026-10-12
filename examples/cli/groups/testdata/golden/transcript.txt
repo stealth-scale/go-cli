@@ -1,0 +1,54 @@
+$ proxy serve --help
+Usage: proxy serve [options]
+
+Print the listeners, the backend, the cache and the log of the proxy.
+
+Options:
+      --addr string               Address to listen on.            env PROXY_SERVE_ADDR, key serve.addr
+      --admin-addr string         Address to listen on.            env PROXY_SERVE_ADMIN_ADDR, key serve.admin.addr
+      --admin-tls-cert string     Certificate file.                env PROXY_SERVE_ADMIN_TLS_CERT, key serve.admin.tls.cert
+      --admin-tls-key string      Key file.                        env PROXY_SERVE_ADMIN_TLS_KEY, key serve.admin.tls.key
+      --backend-timeout duration  Timeout of a request.            default "30s", env PROXY_SERVE_BACKEND_TIMEOUT, key serve.backend.timeout
+      --backend-url string        URL of the server.               default "http://localhost:9000", env PROXY_SERVE_BACKEND_URL, key serve.backend.url
+      --cache-dir string          Directory of the cache.          env PROXY_SERVE_CACHE_DIR, key serve.cache.dir
+      --cache-size int            Size of the cache in megabytes.  default "64", env PROXY_SERVE_CACHE_SIZE, key serve.cache.size
+      --level debug|info|warn     Level of the log.                default "info", env PROXY_SERVE_LEVEL, key serve.level
+      --tls-cert string           Certificate file.                env PROXY_SERVE_TLS_CERT, key serve.tls.cert
+      --tls-key string            Key file.                        env PROXY_SERVE_TLS_KEY, key serve.tls.key
+
+Global options:
+  -c, --config file  Config file in JSON.                                                    env PROXY_CONFIG
+      --flag-debug   Print the value and the source of each option before the command runs.  env PROXY_FLAG_DEBUG
+  -h, --help         Show the help.
+[exit 0]
+
+$ proxy serve --addr :443 --tls-cert public.pem --tls-key public.key
+public ":443" with "public.pem" and "public.key"
+admin  "" with "" and ""
+backend http://localhost:9000 within 30s
+cache "" of 64 MB, log info
+[exit 0]
+
+$ PROXY_SERVE_ADMIN_TLS_CERT=rotated.pem PROXY_SERVE_BACKEND_TIMEOUT=5s proxy -c proxy.json serve --cache-dir /var/cache/proxy --flag-debug
+  OPTION             VALUE                   SOURCE
+  --config           "proxy.json"            flag --config
+  --addr             ""                      default
+  --admin-addr       "127.0.0.1:9443"        key serve.admin.addr of proxy.json
+  --admin-tls-cert   "rotated.pem"           env PROXY_SERVE_ADMIN_TLS_CERT
+  --admin-tls-key    "admin.key"             key serve.admin.tls.key of proxy.json
+  --backend-timeout  5s                      env PROXY_SERVE_BACKEND_TIMEOUT
+  --backend-url      "http://10.0.0.7:9000"  key serve.backend.url of proxy.json
+  --cache-dir        "/var/cache/proxy"      flag --cache-dir
+  --cache-size       128                     key serve.cache.size of proxy.json
+  --level            "warn"                  key serve.level of proxy.json
+  --tls-cert         ""                      default
+  --tls-key          ""                      default
+public "" with "" and ""
+admin  "127.0.0.1:9443" with "rotated.pem" and "admin.key"
+backend http://10.0.0.7:9000 within 5s
+cache "/var/cache/proxy" of 128 MB, log warn
+[exit 0]
+
+$ proxy serve >/dev/full
+proxy: main: write the options: transcript: no space left on device
+[exit 1]

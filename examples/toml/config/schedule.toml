@@ -1,0 +1,10 @@
+# Copyright Stealth Scale B.V. 2026
+# SPDX-License-Identifier: MIT
+
+[backup]
+start = 2026-10-12T02:00:00Z
+every = "12h"
+targets = ["database", "uploads"]
+
+[backup.retention]
+days = 30
