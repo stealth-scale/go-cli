@@ -27,8 +27,8 @@ type Global struct {
 }
 
 type Serve struct {
-	Addr    string        `help:"Address to listen on."     default:":8080" short:"a"`
-	Timeout time.Duration `help:"Timeout of a request."     default:"30s"`
+	Addr    string        `help:"Address to listen on." default:":8080" short:"a"`
+	Timeout time.Duration `help:"Timeout of a request." default:"30s"`
 	Origins []string      `help:"Origins that may connect."`
 }
 
@@ -99,12 +99,14 @@ name of the field:
 | Name | Rule | `Timeout` in `srv serve` |
 |---|---|---|
 | Flag | The name of the field in kebab case | `--timeout` |
-| Environment variable | The app, the command and the flag in upper case with an underscore for each dash | `SRV_SERVE_TIMEOUT` |
-| Config key | The command and the flag joined with dots | `serve.timeout` |
+| Environment variable | The app, the path of the command and the flag in upper case with an underscore for each dash | `SRV_SERVE_TIMEOUT` |
+| Config key | The path of the command and the flag joined with dots | `serve.timeout` |
 
 Kebab case splits the name of a field into words, so `DryRun` becomes `--dry-run` and `HTTPPort`
 becomes `--http-port`. The variable and the key of a global option leave out the command. The global
-option `Config` has the variable `SRV_CONFIG`.
+option `Config` has the variable `SRV_CONFIG`. The path of a subcommand contains the names of its
+command and of itself, so the option `Steps` of `srv db migrate` has the variable
+`SRV_DB_MIGRATE_STEPS` and the key `db.migrate.steps`.
 
 The name of an app, a command, a group or an option has words of lower-case ASCII letters and
 digits. Single dashes join the words. The first word starts with a letter.
@@ -134,8 +136,8 @@ struct have the same options. An embedded struct adds its options without a grou
 
 ```go
 type Target struct {
-	Env    string `help:"Environment to act on."     required:"" enum:"dev,prod" short:"e"`
-	Region string `help:"Region of the environment."                             default:"eu-west-1"`
+	Env    string `help:"Environment to act on." required:"" enum:"dev,prod" short:"e"`
+	Region string `help:"Region of the environment." default:"eu-west-1"`
 }
 
 type Plan struct {
@@ -152,14 +154,62 @@ a.Command("plan", "Print the changes of a deployment.", plan)
 a.Command("apply", "Apply the changes of a deployment.", apply)
 ```
 
+`App.Command` returns the command, and its method `Command` adds a subcommand. A command has a
+handler, subcommands or both. The options of a command apply to its subcommands as well. A
+subcommand reads them through an embedded pointer to their type. The package sets the pointer:
+
+```go
+type Registry struct {
+	URL     string `help:"URL of the registry." default:"registry.example.com"`
+	User    string `help:"User of the registry." default:"deploy"`
+	session string
+}
+
+type Push struct {
+	*Registry
+	Image string `help:"Image to push." arg:""`
+}
+
+registry := a.Command("registry", "Count the images of the registry.", images)
+registry.Use(signIn)
+registry.Command("push", "Push an image to the registry.", push)
+```
+
+A hook runs before the handler of its command and of every subcommand of that command. It calls
+`next` to run the handler, so its code after `next` runs after the handler returns or fails. A hook
+passes a value to the handler through the options of its command:
+
+```go
+func signIn(ctx context.Context, run *cli.Run[Global, Registry], next func(context.Context) error) error {
+	r := run.Config()
+	r.session = r.User + "@" + r.URL
+	return next(ctx)
+}
+```
+
+`App.Use` adds a hook that every run calls. `App.Handle` sets the handler of the app, so a program
+such as `wc` runs without a command.
+
+A handler reads the standard input of its run through `Run.Stdin`, so a pipe passes data to a
+command. The program `wc` of the example [`14-testing`](examples/14-testing) counts the words of
+its standard input:
+
+```console
+$ printf 'one two\nthree\n' | wc --words
+3
+```
+
 The command line follows the rules of GNU:
 
 - A long flag takes its value after `=` or in the next argument.
 - Short flags combine in one argument, such as `-vq`. A short flag with a value takes the rest of
   its argument or the next argument, such as `-p8080` or `-p 8080`.
-- A global flag can come before or after the command.
+- A global flag can come anywhere. A flag of a command can come anywhere after the name of the
+  command, so both `deploy registry --url r.internal push` and `deploy registry push --url r.internal`
+  set the URL of the registry.
+- After a command with subcommands, an argument that is not a flag is the name of a subcommand.
 - The argument `--` ends the flags.
-- The flags `-h` and `--help` write the help of the app or of the command.
+- The flags `-h` and `--help` write the help of the app or of the last command of the path.
 
 A run fails for an unknown command, flag or config key. The package suggests a similar command, long
 flag or key when the app declares one:
@@ -167,6 +217,9 @@ flag or key when the app declares one:
 ```console
 $ deploy aply -e dev
 deploy: unknown command "aply" (did you mean apply?)
+
+$ deploy registry pusj app:v2
+deploy: registry: unknown command "pusj" (did you mean push?)
 ```
 
 ## Positional arguments
@@ -184,8 +237,8 @@ fields:
 ```go
 type Add struct {
 	Archive string   `help:"Archive that receives the files." arg:""`
-	Files   []string `help:"Files to add."                    arg:""`
-	Level   int      `help:"Level of the compression."                default:"6" short:"l"`
+	Files   []string `help:"Files to add." arg:""`
+	Level   int      `help:"Level of the compression." default:"6" short:"l"`
 }
 ```
 
@@ -280,8 +333,8 @@ units: check: invalid --target "70F" from flag --target: want a number with the 
 
 ## Config files
 
-An option of the type `cli.ConfigFile` is the path of a config file. The global options and the
-options of a command contain one config file at most. A run reads the file after the defaults and
+An option of the type `cli.ConfigFile` is the path of a config file. The options of the app and of
+the commands of a path contain one config file at most. A run reads the file after the defaults and
 before the environment variables. Each object of the file contains the keys of a command or of a
 group:
 
@@ -294,6 +347,9 @@ group:
   }
 }
 ```
+
+The object of a subcommand is inside the object of its command, so the option `Steps` of
+`srv db migrate` has the key `steps` in `{"db": {"migrate": {"steps": 3}}}`.
 
 The extension of the path selects the format. `cli.New` registers JSON for `.json` and INI for
 `.ini`. `App.Format` registers a format for other extensions. The modules `yaml` and `toml` register
@@ -329,8 +385,8 @@ The value of an option comes from the last source in this list that sets it:
 Every source goes through the same conversion and the same checks.
 
 With the global flag `--flag-debug` or the variable `SRV_FLAG_DEBUG`, a run writes the value and the
-source of every option to the standard error before the handler runs. The run prints `***` for the
-value of a secret option:
+source of every option to the standard error before the hooks and the handler run. The run prints
+`***` for the value of a secret option:
 
 ```console
 $ cat srv.json
@@ -439,42 +495,55 @@ handler can pass the variables of its `Env` to a terminal library such as Bubble
 
 ## Testing
 
-An `Env` contains the arguments, the environment variables, the files and the standard streams of a
-run. A test passes an `Env` of its own, so the run does not read the state of the process. An `Env`
-without `ReadFile` does not read a config file:
+The package `go.stealthscale.io/cli/clitest` runs a program in a test. `clitest.Main` runs one
+command line and returns the exit status and the output of the run:
 
 ```go
 func TestServe(t *testing.T) {
-	var stdout, stderr bytes.Buffer
-	status := app().Main(t.Context(), &cli.Env{
-		Args:   []string{"serve", "--addr", ":9000"},
-		Lookup: cli.Vars(map[string]string{"SRV_SERVE_TIMEOUT": "5s"}),
-		Stdout: &stdout,
-		Stderr: &stderr,
+	res := clitest.Main(t.Context(), app().Main, &clitest.Input{
+		Args:  []string{"serve"},
+		Vars:  map[string]string{"SRV_SERVE_TIMEOUT": "5s"},
+		Files: clitest.Files{"srv.json": `{"serve": {"addr": ":9000"}}`},
 	})
-	if status != cli.ExitOK {
-		t.Fatalf("Main returns %d: %s", status, &stderr)
+	if res.Status != cli.ExitOK {
+		t.Fatalf("Main returns %d: %s", res.Status, res.Stderr)
 	}
-	if got, want := stdout.String(), "listen on :9000 with a timeout of 5s for []\n"; got != want {
-		t.Errorf("serve writes %q, want %q", got, want)
+	if want := "listen on :9000 with a timeout of 5s for []\n"; res.Stdout != want {
+		t.Errorf("serve writes %q, want %q", res.Stdout, want)
 	}
 }
 ```
 
-`Lookup` reports the variables to the options. `Environ` lists them for the renderer and for
-`Run.Environ`. `cli.Environ` builds the second function from the same map as `cli.Vars`:
+A run reads only the arguments, the environment variables, the config files and the standard input
+of its `Input`. A config file outside `Input.Files` does not exist for the run, so the result does
+not depend on the files of the machine. `os.DirFS("testdata")` gives a run the files of a
+directory. Tests that call `clitest` can run in parallel.
+
+`clitest.Transcript` runs a list of command lines and returns the runs as a terminal shows them,
+with the config files that each run read. A test compares the transcript with a golden file, such as
+with the package `golden` of `go.dokimi.dev/assert`:
 
 ```go
-vars := map[string]string{"SRV_SERVE_TIMEOUT": "5s", "NO_COLOR": "1"}
-env := &cli.Env{Lookup: cli.Vars(vars), Environ: cli.Environ(vars), Stdout: &stdout, Stderr: &stderr}
+runs := []clitest.Input{
+	{Comment: "The help of the command serve.", Args: []string{"serve", "--help"}},
+	{Comment: "An unknown flag suggests a known one.", Args: []string{"serve", "--adr", ":9000"}},
+}
+golden.Match(t, "transcript.txt", clitest.Transcript(t.Context(), "srv", app().Main, runs...), golden.ShouldUpdate())
 ```
 
-`cli.NewRun` returns the `Run` of a handler for a test that calls the handler without the app:
+`clitest.NewEnv` returns the `Env` of an `Input` for a test that calls `App.Execute` itself, or a
+handler through `cli.NewRun`:
 
 ```go
-run, err := cli.NewRun(&Global{}, &Serve{Addr: ":9000"}, &cli.Env{Stdout: &stdout, Stderr: &stderr})
+env, out := clitest.NewEnv(&clitest.Input{Stdin: "one two\n"})
+run, err := cli.NewRun(&Global{}, &Serve{Addr: ":9000"}, env)
 ```
 
+`FailStdin` and `FailStdout` make every read of the standard input or every write to the standard
+output fail, so a test can check the error paths of a handler. The examples test themselves with
+`clitest`.
+
+An `Env` of your own builds `Lookup` and `Environ` from one map with `cli.Vars` and `cli.Environ`.
 `App.Execute` and `App.Main` are safe for concurrent use once the registrations have returned, so
 parallel tests can share one app.
 
