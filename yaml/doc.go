@@ -12,6 +12,9 @@
 // [Register] registers [Decode] for the extensions .yaml and .yml. A program that registers the
 // format for other extensions passes Decode to cli.App.Format.
 //
+// [Decode] returns each scalar as its source text. The option that reads a scalar converts the
+// text as it converts a flag, so 0644 is the file mode 0644 and 1.10 is the string 1.10.
+//
 // # Dependency position
 //
 // The package imports fmt, go.yaml.in/yaml/v3 and go.stealthscale.io/cli.

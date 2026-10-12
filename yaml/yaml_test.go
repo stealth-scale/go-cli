@@ -147,9 +147,34 @@ func TestYAML(t *testing.T) {
 				want: map[string]any{"items": []any{map[string]any{"1": "web"}}},
 			},
 			{
-				name: "returns the Go value of each scalar",
-				give: "port: 80\nratio: 0.5\nverbose: true\nname: srv\n",
-				want: map[string]any{"port": 80, "ratio": 0.5, "verbose": true, "name": "srv"},
+				name: "returns the source text of each scalar",
+				give: "port: 80\nmode: 0644\nversion: 1.10\nbuild: 1e3\nverbose: true\nquoted: '007'\n",
+				want: map[string]any{
+					"port": "80", "mode": "0644", "version": "1.10", "build": "1e3", "verbose": "true", "quoted": "007",
+				},
+			},
+			{
+				name: "returns nil for each null value",
+				give: "a: ~\nb:\nc: null\nlist: [~, x]\n",
+				want: map[string]any{"a": nil, "b": nil, "c": nil, "list": []any{nil, "x"}},
+			},
+			{
+				name: "returns the text of a null key",
+				give: "labels: {a: one, ~: two}\n",
+				want: map[string]any{"labels": map[string]any{"a": "one", "~": "two"}},
+			},
+			{
+				name: "returns the text of a key that is an alias of a null",
+				give: "none: &n ~\nlabels: {*n : one}\n",
+				want: map[string]any{"none": nil, "labels": map[string]any{"~": "one"}},
+			},
+			{
+				name: "applies an alias and a merge key",
+				give: "base: &base {port: 0644, host: a}\nserve:\n  <<: *base\n  host: b\n",
+				want: map[string]any{
+					"base":  map[string]any{"port": "0644", "host": "a"},
+					"serve": map[string]any{"port": "0644", "host": "b"},
+				},
 			},
 			{
 				name: "returns no tree for an empty document",
@@ -175,5 +200,40 @@ func TestYAML(t *testing.T) {
 			assert.Equal(t, errors.Unwrap(err), want, "Decode wraps the error of the parser")
 			assert.Equal(t, err.Error(), "yaml: decode: "+want.Error(), "the error states the error of the parser")
 		})
+
+		t.Run("returns the error of go.yaml.in/yaml/v3 for data that is not YAML", func(t *testing.T) {
+			t.Parallel()
+			data := []byte("serve: [\n")
+			_, err := yaml.Decode(data)
+			var node yamlv3.Node
+			want := yamlv3.Unmarshal(data, &node)
+			assert.Equal(t, errors.Unwrap(err), want, "Decode wraps the error of the parser")
+			assert.Equal(t, err.Error(), "yaml: decode: "+want.Error(), "the error states the error of the parser")
+		})
+
+		errs := []struct {
+			name string
+			give string
+			want string
+		}{
+			{
+				name: "returns an error for a duplicate key",
+				give: "port: 80\nport: 81\n",
+				want: "yaml: decode: yaml: unmarshal errors:\n  line 2: mapping key \"port\" already defined at line 1",
+			},
+			{
+				name: "returns an error for an alias that contains itself",
+				give: "list: &list [*list]\n",
+				want: "yaml: decode: yaml: anchor 'list' value contains itself",
+			},
+		}
+		for _, tt := range errs {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+				_, err := yaml.Decode([]byte(tt.give))
+				assert.HasError(t, err, "Decode returns an error")
+				assert.Equal(t, err.Error(), tt.want, "the error states the fault of the document")
+			})
+		}
 	})
 }
