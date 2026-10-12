@@ -1,5 +1,11 @@
 # go.stealthscale.io/cli
 
+## 0.2.0
+
+### Minor Changes
+
+- 79f45ec: Add `InputFile` and `Run.Open` to read an input file or the standard input.
+
 ## 0.1.0
 
 ### Minor Changes
