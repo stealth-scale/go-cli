@@ -82,11 +82,13 @@ go get go.stealthscale.io/cli
 ```
 
 Every module of go-cli requires Go 1.27.2 or later. The package `cli` imports only the standard
-library. The YAML and TOML formats of config files are modules of their own:
+library. The YAML and TOML formats of config files and the Lip Gloss renderer are modules of their
+own:
 
 ```sh
 go get go.stealthscale.io/cli/yaml
 go get go.stealthscale.io/cli/toml
+go get go.stealthscale.io/cli/charm
 ```
 
 ## Options
@@ -370,6 +372,71 @@ example [`examples/cli/errors`](examples/cli/errors) handles these errors in pla
 one command fails a run of any command with an error that wraps `ErrDeclaration`, so the first test
 of the app finds it.
 
+## Output
+
+The renderer of an app writes the help, the message of a failed run and the table of
+`--flag-debug`. `cli.New` sets the renderer `cli.Plain`, which writes the plain text of the other
+sections of this README. `App.Render` registers another `cli.Renderer`. The module
+`go.stealthscale.io/cli/charm` renders the output with Lip Gloss:
+
+```go
+a := cli.New[Global]("srv", "Serve the store.")
+charm.Register(a)
+```
+
+Its help puts the notes of each option below the text of the option:
+
+```console
+$ srv serve --help | cat
+Run the server.
+
+USAGE
+  srv serve [options]
+
+OPTIONS
+  -a, --addr string         Address to listen on.
+                            default ":8080" · env SRV_SERVE_ADDR
+                            key serve.addr
+      --origins string,...  Origins that may connect.
+                            env SRV_SERVE_ORIGINS · key serve.origins
+      --timeout duration    Timeout of a request.
+                            default "30s" · env SRV_SERVE_TIMEOUT
+                            key serve.timeout
+
+GLOBAL OPTIONS
+  -c, --config file         Config file in JSON or INI.
+                            default "srv.json" · env SRV_CONFIG
+      --flag-debug          Print the value and the source of each option before
+                            the command runs.
+                            env SRV_FLAG_DEBUG
+  -h, --help                Show the help.
+```
+
+The help wraps at the width in the environment variable `COLUMNS`, at most 100 columns. Without
+`COLUMNS` it wraps at 80 columns. A terminal receives the help with colors and styles, and a failure
+with a red badge, the suggestion and a hint to the help:
+
+```console
+$ srv serve --adr :9000
+ ERROR  unknown flag --adr
+        Did you mean --addr?
+        Run srv serve --help for the usage.
+```
+
+A pipe or a file receives the help without styles, and the failure and the table of `cli.Plain`.
+`NO_COLOR` removes the colors in a terminal, and `CLICOLOR_FORCE` writes the styles to any writer.
+A program changes the styles of `charm.DefaultTheme` and passes the theme to `charm.New`:
+
+```go
+t := charm.DefaultTheme()
+t.Flag = t.Flag.Foreground(lipgloss.Green)
+a.Render(charm.New(&t))
+```
+
+A renderer of your own implements the three methods of `cli.Renderer`. It can embed `cli.Plain` to
+replace only some of them. `Run.Environ` returns the environment of a run to its handler, so the
+handler can pass the variables of its `Env` to a terminal library such as Bubble Tea.
+
 ## Testing
 
 An `Env` contains the arguments, the environment variables, the files and the standard streams of a
@@ -394,6 +461,14 @@ func TestServe(t *testing.T) {
 }
 ```
 
+`Lookup` reports the variables to the options. `Environ` lists them for the renderer and for
+`Run.Environ`. `cli.Environ` builds the second function from the same map as `cli.Vars`:
+
+```go
+vars := map[string]string{"SRV_SERVE_TIMEOUT": "5s", "NO_COLOR": "1"}
+env := &cli.Env{Lookup: cli.Vars(vars), Environ: cli.Environ(vars), Stdout: &stdout, Stderr: &stderr}
+```
+
 `cli.NewRun` returns the `Run` of a handler for a test that calls the handler without the app:
 
 ```go
@@ -410,10 +485,11 @@ parallel tests can share one app.
 | `go.stealthscale.io/cli` | The package `cli` with the formats JSON and INI | None |
 | `go.stealthscale.io/cli/yaml` | The YAML format | `go.yaml.in/yaml/v3` |
 | `go.stealthscale.io/cli/toml` | The TOML format | `github.com/BurntSushi/toml` |
+| `go.stealthscale.io/cli/charm` | The renderer of the output with Lip Gloss | `charm.land/lipgloss/v2`, `github.com/charmbracelet/colorprofile` |
 
 ## Examples
 
-[`examples/`](examples) contains 13 runnable programs. The test of each example compares its output
+[`examples/`](examples) contains 14 runnable programs. The test of each example compares its output
 with a golden transcript. [examples/README.md](examples/README.md) lists what each example shows.
 
 ## Development
