@@ -9,3 +9,4 @@ Proposals, and the argument that produced them. An RFC is written to be argued w
 
 | RFC | Title | Status |
 |---|---|---|
+| [0001](0001-renderers-and-a-charm-module.md) | Renderers for the output of the package cli and a Charm module | Accepted |
