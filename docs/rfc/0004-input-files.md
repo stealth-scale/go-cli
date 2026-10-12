@@ -2,7 +2,7 @@
 rfc: 0004
 title: Input files and the standard input
 author: Roy Klopper <roy.klopper@stealthscale.io>
-status: Draft
+status: Accepted
 created: 2026-10-12
 updated: 2026-10-12
 discussion: none
