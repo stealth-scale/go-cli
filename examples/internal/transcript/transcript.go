@@ -81,7 +81,9 @@ func Write(ctx context.Context, name string, runs []Run, program func(context.Co
 		if r.Stdin != "" {
 			line = "printf '" + printfEscapes.Replace(r.Stdin) + "' | " + line
 		}
-		b.WriteString("$ " + line + "\n")
+		b.WriteString("$ ")
+		b.WriteString(line)
+		b.WriteString("\n")
 		env := &cli.Env{
 			Lookup:   cli.Vars(r.Vars),
 			Environ:  cli.Environ(r.Vars),
@@ -92,7 +94,9 @@ func Write(ctx context.Context, name string, runs []Run, program func(context.Co
 			Args:     r.Args,
 		}
 		status := program(ctx, env)
-		b.WriteString("[exit " + strconv.Itoa(status) + "]\n")
+		b.WriteString("[exit ")
+		b.WriteString(strconv.Itoa(status))
+		b.WriteString("]\n")
 	}
 	return b.Bytes()
 }

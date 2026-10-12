@@ -4,10 +4,9 @@
 package cli_test
 
 import (
+	"fmt"
 	"maps"
 	"slices"
-	"strconv"
-	"strings"
 	"testing"
 
 	"go.dokimi.dev/assert"
@@ -66,22 +65,22 @@ func TestINI(t *testing.T) {
 			prop.ForAll(t, "INI decodes the keys of each section that a renderer writes", func(c *prop.Case) {
 				top := c.Draw(values, "top")
 				sections := c.Draw(prop.Dict(section, values, prop.MaxSize(3)), "sections")
-				var b strings.Builder
+				var data []byte
 				want := map[string]any{}
 				for _, k := range slices.Sorted(maps.Keys(top)) {
-					b.WriteString(k + " = " + strconv.Quote(top[k]) + "\n")
+					data = fmt.Appendf(data, "%s = %q\n", k, top[k])
 					want[k] = top[k]
 				}
 				for _, s := range slices.Sorted(maps.Keys(sections)) {
-					b.WriteString("[" + s + "]\n")
+					data = fmt.Appendf(data, "[%s]\n", s)
 					keys := map[string]any{}
 					for k, v := range sections[s] {
-						b.WriteString(k + " = " + strconv.Quote(v) + "\n")
+						data = fmt.Appendf(data, "%s = %q\n", k, v)
 						keys[k] = v
 					}
 					want[s] = keys
 				}
-				got, err := cli.INI([]byte(b.String()))
+				got, err := cli.INI(data)
 				assert.NoError(c, err, "INI decodes the rendered data")
 				assert.Equal(c, got, want, "INI returns the rendered keys and sections")
 			})

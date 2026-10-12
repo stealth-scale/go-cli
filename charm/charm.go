@@ -75,14 +75,18 @@ func (r *Renderer) Help(w io.Writer, environ []string, h *cli.Help) error {
 		hang(&b, "", styled(&t.Text, wrap(h.Text, width)), "")
 		b.WriteString("\n")
 	}
-	usage := []string{t.Program.Render(h.App)}
+	b.WriteString(t.Heading.Render("USAGE"))
+	b.WriteString("\n" + indent)
+	b.WriteString(t.Program.Render(h.App))
 	if h.Command != "" {
-		usage = append(usage, t.Command.Render(h.Command))
+		b.WriteString(" ")
+		b.WriteString(t.Command.Render(h.Command))
 	}
 	for _, part := range h.Usage {
-		usage = append(usage, t.Argument.Render(part))
+		b.WriteString(" ")
+		b.WriteString(t.Argument.Render(part))
 	}
-	b.WriteString(t.Heading.Render("USAGE") + "\n" + indent + strings.Join(usage, " ") + "\n")
+	b.WriteString("\n")
 	commands := make([]entry, len(h.Commands))
 	for i, c := range h.Commands {
 		commands[i] = entry{key: t.Command.Render(c.Name), text: c.Text}
@@ -157,7 +161,11 @@ func (r *Renderer) Debug(w io.Writer, environ []string, rows []cli.DebugRow) err
 	}
 	var b strings.Builder
 	for _, cells := range table {
-		b.WriteString(indent + pad(cells[0], first) + gap + pad(cells[1], second) + gap + cells[2] + "\n")
+		b.WriteString(indent)
+		b.WriteString(pad(cells[0], first+len(gap)))
+		b.WriteString(pad(cells[1], second+len(gap)))
+		b.WriteString(cells[2])
+		b.WriteString("\n")
 	}
 	if _, err := out.WriteString(b.String()); err != nil {
 		return fmt.Errorf("charm: write the output of --flag-debug: %w", err)
@@ -218,7 +226,9 @@ func (r *Renderer) section(b *strings.Builder, heading string, entries []entry, 
 	t := &r.theme
 	text := max(width-column, minText)
 	margin := strings.Repeat(" ", column)
-	b.WriteString("\n" + t.Heading.Render(heading) + "\n")
+	b.WriteString("\n")
+	b.WriteString(t.Heading.Render(heading))
+	b.WriteString("\n")
 	for _, e := range entries {
 		var lines []string
 		if e.text != "" {
@@ -227,7 +237,8 @@ func (r *Renderer) section(b *strings.Builder, heading string, entries []entry, 
 		lines = append(lines, pack(e.notes, t.Note.Render(separator), text)...)
 		head := margin
 		if key := indent + e.key; len(lines) == 0 || lipgloss.Width(key)+len(gap) > column {
-			b.WriteString(key + "\n")
+			b.WriteString(key)
+			b.WriteString("\n")
 		} else {
 			head = pad(key, column)
 		}
@@ -271,7 +282,8 @@ func hang(b *strings.Builder, head string, lines []string, margin string) {
 		if i > 0 {
 			head = margin
 		}
-		b.WriteString(strings.TrimRight(head+line, " ") + "\n")
+		b.WriteString(strings.TrimRight(head+line, " "))
+		b.WriteString("\n")
 	}
 }
 

@@ -6,7 +6,6 @@ package cli
 import (
 	"fmt"
 	"io"
-	"slices"
 	"strings"
 )
 
@@ -87,14 +86,22 @@ type Plain struct{}
 // Error modes:
 //   - an error that wraps the error of w.
 func (Plain) Help(w io.Writer, _ []string, h *Help) error {
-	names := []string{h.App}
-	if h.Command != "" {
-		names = append(names, h.Command)
-	}
 	var b strings.Builder
-	b.WriteString("Usage: " + strings.Join(slices.Concat(names, h.Usage), " ") + "\n")
+	b.WriteString("Usage: ")
+	b.WriteString(h.App)
+	if h.Command != "" {
+		b.WriteString(" ")
+		b.WriteString(h.Command)
+	}
+	for _, part := range h.Usage {
+		b.WriteString(" ")
+		b.WriteString(part)
+	}
+	b.WriteString("\n")
 	if h.Text != "" {
-		b.WriteString("\n" + h.Text + "\n")
+		b.WriteString("\n")
+		b.WriteString(h.Text)
+		b.WriteString("\n")
 	}
 	commands := make([][3]string, len(h.Commands))
 	for i, c := range h.Commands {

@@ -128,7 +128,9 @@ func writeSection(b *strings.Builder, heading string, rows [][3]string) {
 	if len(rows) == 0 {
 		return
 	}
-	b.WriteString("\n" + heading + ":\n")
+	b.WriteString("\n")
+	b.WriteString(heading)
+	b.WriteString(":\n")
 	writeRows(b, rows)
 }
 
@@ -143,6 +145,7 @@ func writeRows(b *strings.Builder, rows [][3]string) {
 	for _, r := range rows {
 		line := indent + r[0] + strings.Repeat(" ", first-utf8.RuneCountInString(r[0])) + columnGap +
 			r[1] + strings.Repeat(" ", second-utf8.RuneCountInString(r[1])) + columnGap + r[2]
-		b.WriteString(strings.TrimRight(line, " ") + "\n")
+		b.WriteString(strings.TrimRight(line, " "))
+		b.WriteString("\n")
 	}
 }
