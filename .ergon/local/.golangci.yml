@@ -5,8 +5,10 @@
 
 linters:
   settings:
-    # Production code imports only the standard library and this module. Tests may also import
-    # go.dokimi.dev/assert. golangci-lint reports any other import.
+    # The production code of the module go.stealthscale.io/cli imports only the standard library.
+    # The production code of a format module also imports the parser of its format. The tests of the
+    # cli module may also import go.dokimi.dev/assert, and the tests of a format module the parser of
+    # its format. golangci-lint reports any other import.
     depguard:
       rules:
         main:
@@ -14,17 +16,43 @@ linters:
           files:
             - "$all"
             - "!$test"
+            - "!**/toml/*.go"
+            - "!**/yaml/*.go"
           allow:
             - $gostd
             - go.stealthscale.io/cli
+        formats:
+          list-mode: strict
+          files:
+            - "**/toml/*.go"
+            - "**/yaml/*.go"
+            - "!$test"
+          allow:
+            - $gostd
+            - github.com/BurntSushi/toml
+            - go.stealthscale.io/cli
+            - go.yaml.in/yaml/v3
         test:
           list-mode: strict
           files:
             - "$test"
+            - "!**/toml/*_test.go"
+            - "!**/yaml/*_test.go"
           allow:
             - $gostd
             - go.stealthscale.io/cli
             - go.dokimi.dev/assert
+        format-tests:
+          list-mode: strict
+          files:
+            - "**/toml/*_test.go"
+            - "**/yaml/*_test.go"
+          allow:
+            - $gostd
+            - github.com/BurntSushi/toml
+            - go.dokimi.dev/assert
+            - go.stealthscale.io/cli
+            - go.yaml.in/yaml/v3
 
 formatters:
   settings:
