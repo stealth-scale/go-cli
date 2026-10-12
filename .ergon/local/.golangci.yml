@@ -1,0 +1,38 @@
+# Copyright Stealth Scale B.V. 2026
+# SPDX-License-Identifier: MIT
+
+# ergon init sync merges these settings of go-cli into .golangci.yml.
+
+linters:
+  settings:
+    # Production code imports only the standard library and this module. Tests may also import
+    # go.dokimi.dev/assert. golangci-lint reports any other import.
+    depguard:
+      rules:
+        main:
+          list-mode: strict
+          files:
+            - "$all"
+            - "!$test"
+          allow:
+            - $gostd
+            - go.stealthscale.io/cli
+        test:
+          list-mode: strict
+          files:
+            - "$test"
+          allow:
+            - $gostd
+            - go.stealthscale.io/cli
+            - go.dokimi.dev/assert
+
+formatters:
+  settings:
+    # gci puts the imports of this module in a group of their own after the standard library and
+    # the other modules.
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(go.stealthscale.io/cli)
+      custom-order: true
