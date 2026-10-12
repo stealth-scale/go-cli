@@ -130,8 +130,19 @@ linters:
             - "!**/charm/*.go"
             - "!**/toml/*.go"
             - "!**/yaml/*.go"
+            - "!**/examples/*/*.go"
           allow:
             - $gostd
+            - go.stealthscale.io/cli
+        examples:
+          list-mode: strict
+          files:
+            - "**/examples/*/*.go"
+            - "!$test"
+          allow:
+            - $gostd
+            - charm.land/lipgloss/v2
+            - github.com/charmbracelet/colorprofile
             - go.stealthscale.io/cli
         formats:
           list-mode: strict
@@ -274,6 +285,7 @@ linters:
         - filepath\.Walk\(
         - \(go\.stealthscale\.io/cli\.Plain\)\.
         - \.Open\(name string\) \(io/fs\.File, error\)$
+        - ^func os\.Open\(name string\) \(\*os\.File, error\)$
       ignore-interface-regexps:
         - ^cli\.Renderer$
   exclusions:

@@ -7,9 +7,10 @@ linters:
   settings:
     # The production code of the module go.stealthscale.io/cli imports only the standard library.
     # The production code of a format module also imports the parser of its format, and the module
-    # charm imports Lip Gloss and colorprofile. The tests of the cli module may also import
-    # go.dokimi.dev/assert, and the tests of another module the libraries of its production code.
-    # golangci-lint reports any other import.
+    # charm imports Lip Gloss and colorprofile. An example may import Lip Gloss and colorprofile too.
+    # The example of the module charm writes the styled output of a handler with them. The tests of
+    # the cli module may also import go.dokimi.dev/assert, and the tests of another module the
+    # libraries of its production code. golangci-lint reports any other import.
     depguard:
       rules:
         main:
@@ -20,8 +21,19 @@ linters:
             - "!**/charm/*.go"
             - "!**/toml/*.go"
             - "!**/yaml/*.go"
+            - "!**/examples/*/*.go"
           allow:
             - $gostd
+            - go.stealthscale.io/cli
+        examples:
+          list-mode: strict
+          files:
+            - "**/examples/*/*.go"
+            - "!$test"
+          allow:
+            - $gostd
+            - charm.land/lipgloss/v2
+            - github.com/charmbracelet/colorprofile
             - go.stealthscale.io/cli
         formats:
           list-mode: strict
@@ -78,13 +90,16 @@ linters:
     # The package cli returns the error of a Renderer unchanged, as it returns the error of a
     # handler unchanged. The renderer Plain wraps the errors of its writer itself, so a renderer
     # that delegates to Plain returns those errors unchanged too. A file system that delegates to
-    # another fs.FS returns its *fs.PathError unchanged, as the contract of fs.FS requires.
+    # another fs.FS returns its *fs.PathError unchanged, as the contract of fs.FS requires. The Open
+    # of cli.OS has the signature of fs.FS.Open, so it returns the *fs.PathError of os.Open
+    # unchanged too.
     wrapcheck:
       ignore-interface-regexps:
         - ^cli\.Renderer$
       ignore-sig-regexps:
         - \(go\.stealthscale\.io/cli\.Plain\)\.
         - \.Open\(name string\) \(io/fs\.File, error\)$
+        - ^func os\.Open\(name string\) \(\*os\.File, error\)$
 
 formatters:
   settings:
