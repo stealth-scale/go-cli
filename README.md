@@ -253,7 +253,7 @@ Arguments:
       FILES    Files to add.
 
 Options:
-  -l, --level int  Level of the compression.  default "6", env PACK_ADD_LEVEL, key add.level
+  -l, --level int  Level of the compression.  default "6", env PACK_ADD_LEVEL
 
 Global options:
       --flag-debug  Print the value and the source of each option before the command runs.  env PACK_FLAG_DEBUG
@@ -394,6 +394,8 @@ group:
 The object of a subcommand is inside the object of its command, so the option `Steps` of
 `srv db migrate` has the key `steps` in `{"db": {"migrate": {"steps": 3}}}`.
 
+The help notes the config key of an option only for a command whose path declares a config file.
+
 The extension of the path selects the format. `cli.New` registers JSON for `.json` and INI for
 `.ini`. `App.Format` registers a format for other extensions. The modules `yaml` and `toml` register
 their formats with one call:
@@ -415,6 +417,29 @@ $ cat srv.json
 $ srv serve
 srv: serve: unknown key serve.adr in srv.json (did you mean serve.addr?)
 ```
+
+A config file can also contain keys that the program decodes itself, such as the plans of a
+workspace. `App.IgnoreKeys` registers them. A run skips each such key and every key below it, and
+the handler reads them from the file at the path of the option:
+
+```go
+a.IgnoreKeys("version", "plans")
+```
+
+`App.LocateConfig` registers a function that returns the path of the config file when neither the
+flag nor the environment variable sets it, such as a search from a directory upward. The function
+receives the global options and the `Env` of the run. A search that opens its candidates through
+`Env.Open` reads only the files of a test:
+
+```go
+a.LocateConfig(func(g *Global, env *cli.Env) (string, error) {
+	return search(env, g.Chdir, ".acme.json")
+})
+```
+
+`--flag-debug` shows a located path with the source `located`. The example
+[`16-workspace`](examples/16-workspace) searches for its workspace file and decodes its plans
+itself.
 
 ## Sources
 
@@ -533,11 +558,25 @@ a.Render(charm.New(&t))
 ```
 
 A renderer of your own implements the three methods of `cli.Renderer`. It can embed `cli.Plain` to
-replace only some of them. The renderer of the example [`15-renderer`](examples/15-renderer)
-writes the help, the failures and the rows of `--flag-debug` as JSON when the environment contains
-`OUTPUT=json`, and the text of `cli.Plain` otherwise. `Run.Environ` returns the environment of a run
-to its handler, so the handler can pass the variables of its `Env` to a terminal library such as
-Bubble Tea.
+replace only some of them. `App.RenderFor` registers a function that selects the renderer of each
+run from its global options, so an option such as `--format json` selects the output of the help,
+the failures and `--flag-debug`:
+
+```go
+a.RenderFor(func(g *Global) cli.Renderer {
+	if g.Format == "json" {
+		return jsonRenderer{}
+	}
+	return cli.Plain{}
+})
+```
+
+A run applies the valid values of its sources before the function selects the renderer, so the
+usage error of a command line with `--format json` is JSON too. The flags count up to the first
+fault of the command line. The example [`15-renderer`](examples/15-renderer) writes JSON this way.
+
+`Run.Environ` returns the environment of a run to its handler, so the handler can pass the
+variables of its `Env` to a terminal library such as Bubble Tea.
 
 ## Testing
 
@@ -606,7 +645,7 @@ parallel tests can share one app.
 
 ## Examples
 
-[`examples/`](examples) contains 15 runnable programs. The test of each example compares its output
+[`examples/`](examples) contains 16 runnable programs. The test of each example compares its output
 with a golden transcript. [examples/README.md](examples/README.md) lists what each example shows.
 
 ## Development
