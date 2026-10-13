@@ -575,6 +575,20 @@ A run applies the valid values of its sources before the function selects the re
 usage error of a command line with `--format json` is JSON too. The flags count up to the first
 fault of the command line. The example [`15-renderer`](examples/15-renderer) writes JSON this way.
 
+`App.Main` writes the failure of a run to the standard error and returns 1 or 2. A program with
+exit statuses or streams of its own calls `App.ExecuteRenderer`, which returns the renderer of the
+run beside its error. `App.Failure` returns the failure that `App.Main` writes for that error:
+
+```go
+r, err := a.ExecuteRenderer(ctx, env)
+if f := a.Failure(err); f != nil {
+	_ = r.Error(env.Stdout, env.Environ(), f)
+}
+```
+
+The example `15-renderer` exits with 64 for a usage error this way, and writes a failure in JSON
+to the standard output.
+
 `Run.Environ` returns the environment of a run to its handler, so the handler can pass the
 variables of its `Env` to a terminal library such as Bubble Tea.
 
