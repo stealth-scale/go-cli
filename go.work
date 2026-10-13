@@ -11,10 +11,10 @@ use (
 	./yaml
 )
 
-replace go.stealthscale.io/cli v0.2.0 => ./
+replace go.stealthscale.io/cli v0.3.0 => ./
 
-replace go.stealthscale.io/cli/charm v0.1.1 => ./charm
+replace go.stealthscale.io/cli/charm v0.1.2 => ./charm
 
-replace go.stealthscale.io/cli/toml v0.1.1 => ./toml
+replace go.stealthscale.io/cli/toml v0.1.2 => ./toml
 
-replace go.stealthscale.io/cli/yaml v0.1.1 => ./yaml
+replace go.stealthscale.io/cli/yaml v0.1.2 => ./yaml
