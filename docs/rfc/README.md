@@ -15,3 +15,4 @@ Proposals, and the argument that produced them. An RFC is written to be argued w
 | [0004](0004-input-files.md) | Input files and the standard input | Accepted |
 | [0005](0005-a-renderer-for-each-run.md) | A renderer for each run | Accepted |
 | [0006](0006-ignored-keys-and-a-located-config-file.md) | Ignored config keys and a located config file | Accepted |
+| [0007](0007-the-renderer-and-the-failure-of-a-run.md) | The renderer and the failure of a run for a caller of Execute | Accepted |
