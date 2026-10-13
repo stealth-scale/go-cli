@@ -1,5 +1,12 @@
 # go.stealthscale.io/cli/toml
 
+## 0.1.3
+
+### Patch Changes
+
+- Updated dependencies [84352e6]
+  - go.stealthscale.io/cli@0.4.0
+
 ## 0.1.2
 
 ### Patch Changes

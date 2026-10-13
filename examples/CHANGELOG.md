@@ -1,5 +1,15 @@
 # go.stealthscale.io/cli/examples
 
+## 0.0.4
+
+### Patch Changes
+
+- Updated dependencies [84352e6]
+  - go.stealthscale.io/cli@0.4.0
+  - go.stealthscale.io/cli/charm@0.1.3
+  - go.stealthscale.io/cli/toml@0.1.3
+  - go.stealthscale.io/cli/yaml@0.1.3
+
 ## 0.0.3
 
 ### Patch Changes

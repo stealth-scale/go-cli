@@ -1,5 +1,11 @@
 # go.stealthscale.io/cli
 
+## 0.4.0
+
+### Minor Changes
+
+- 84352e6: Add `App.ExecuteRenderer` and `App.Failure` to write the failure of a run without `App.Main`.
+
 ## 0.3.0
 
 ### Minor Changes
