@@ -83,7 +83,7 @@ func (o *Output) snapshot() ([]file, string) {
 
 // file is a file that a run opened.
 type file struct {
-	name string // the path of the open
+	name string // the path of the open with slashes
 	data []byte // the content of the file
 }
 
@@ -127,7 +127,8 @@ func (full) Write([]byte) (int, error) {
 // leading slash, so /etc/srv.json is the file etc/srv.json of in.Files. An open of a path outside
 // in.Files, and every open without in.Files, returns an error that wraps fs.ErrNotExist. The error
 // of an open is an *fs.PathError with the path of the open. The Output records the content of each
-// file that a run opens, and the opened file reads that content.
+// file that a run opens under the path of the open with slashes, so a transcript is the same on
+// every system. The opened file reads that content.
 func NewEnv(in *Input) (*cli.Env, *Output) {
 	out := new(Output)
 	files := in.Files
@@ -146,7 +147,7 @@ func NewEnv(in *Input) (*cli.Env, *Output) {
 				}
 				return nil, &fs.PathError{Op: "open", Path: name, Err: err}
 			}
-			out.read(name, data)
+			out.read(filepath.ToSlash(name), data)
 			return fstest.MapFS{clean: {Data: data}}.Open(clean)
 		},
 		Stdin:  strings.NewReader(in.Stdin),

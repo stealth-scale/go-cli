@@ -6,6 +6,7 @@ package clitest_test
 import (
 	"context"
 	"io"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -133,6 +134,26 @@ func TestTranscript(t *testing.T) {
 			got := clitest.Transcript(t.Context(), "srv", program, in)
 			assert.Equal(t, string(got), "$ cat b.json\n[]\n$ cat a.json\n{}\n$ srv\n[exit 0]\n",
 				"the transcript writes each file once")
+		})
+
+		t.Run("writes the path of a file that a run opens with slashes", func(t *testing.T) {
+			t.Parallel()
+			program := func(_ context.Context, env *cli.Env) int {
+				for _, name := range []string{filepath.Join("conf", "srv.json"), "conf/srv.json"} {
+					f, err := env.Open(name)
+					if err != nil {
+						return cli.ExitFailure
+					}
+					if err := f.Close(); err != nil {
+						return cli.ExitFailure
+					}
+				}
+				return cli.ExitOK
+			}
+			in := clitest.Input{Files: clitest.Files{"conf/srv.json": "{}\n"}}
+			got := clitest.Transcript(t.Context(), "srv", program, in)
+			assert.Equal(t, string(got), "$ cat conf/srv.json\n{}\n$ srv\n[exit 0]\n",
+				"the transcript writes the file once, with slashes on every system")
 		})
 
 		t.Run("lets a goroutine of a run write after Transcript returns", func(t *testing.T) {

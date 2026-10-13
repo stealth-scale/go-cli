@@ -25,8 +25,9 @@ var printfEscapes = strings.NewReplacer(`\`, `\\`, "%", "%%", "\n", `\n`, "'", `
 // terminal shows them. name is the name of the program in the command lines of the transcript. A
 // blank line separates two runs, and the transcript of a run contains these lines:
 //   - each line of the comment of the run, after "# ".
-//   - each file that the run opened, in the order of the first opens: "$ cat" and the path, then
-//     the content of the file with a final newline. These are its config file and its input files.
+//   - each file that the run opened, in the order of the first opens: "$ cat" and the path with
+//     slashes, then the content of the file with a final newline. These are its config file and its
+//     input files.
 //   - "$ " and the command line of the run: the environment variables in the order of their names,
 //     name and the arguments, with quotes where a shell needs them. A standard input precedes the
 //     command line as the output of printf. The command line of a run with Input.FailStdin ends with
