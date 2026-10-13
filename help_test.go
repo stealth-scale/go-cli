@@ -5,6 +5,7 @@ package cli_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -47,6 +48,18 @@ type (
 	countGlobal struct {
 		Files []string `help:"Files to count."  arg:"" default:""`
 		Lines bool     `help:"Count the lines."                   short:"l"`
+	}
+	// keyGlobal, keyStore and keySteps are the options of an app whose command db declares the config
+	// file and whose subcommand db migrate inherits it.
+	keyGlobal struct {
+		Verbose bool `help:"Log more."`
+	}
+	keyStore struct {
+		Config cli.ConfigFile `help:"Config file in JSON."`
+		DSN    string         `help:"Address of the database."`
+	}
+	keySteps struct {
+		Steps int `help:"Number of migrations."`
 	}
 )
 
@@ -154,5 +167,60 @@ func TestHelp(t *testing.T) {
 			assert.NoError(t, res.err, "Execute writes the help")
 			golden.Match(t, "help/bare-command.txt", []byte(res.stdout), golden.ShouldUpdate())
 		})
+
+		keys := []struct {
+			name     string
+			giveArgs []string
+			want     map[string]string
+		}{
+			{
+				name:     "leaves out the config keys in the help of an app without a config file",
+				giveArgs: []string{"-h"},
+				want:     map[string]string{"--flag-debug": "", "--help": "", "--verbose": ""},
+			},
+			{
+				name:     "notes the config keys in the help of a command with a config file",
+				giveArgs: []string{parent, "-h"},
+				want: map[string]string{
+					"--config": "", "--dsn": "db.dsn", "--flag-debug": "", "--help": "", "--verbose": "verbose",
+				},
+			},
+			{
+				name:     "notes the config keys in the help of a subcommand of a command with a config file",
+				giveArgs: []string{parent, subcommand, "-h"},
+				want: map[string]string{
+					"--config": "", "--dsn": "db.dsn", "--flag-debug": "", "--help": "",
+					"--steps": "db.migrate.steps", "--verbose": "verbose",
+				},
+			},
+			{
+				name:     "leaves out the config keys in the help of a command without a config file on its path",
+				giveArgs: []string{command, "-h"},
+				want:     map[string]string{"--addr": "", "--flag-debug": "", "--help": "", "--verbose": ""},
+			},
+		}
+		for _, tt := range keys {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+				app, _, _ := nesting[keyGlobal, keyStore, keySteps](t)
+				app.Command(
+					command,
+					commandHelp,
+					func(context.Context, *cli.Run[keyGlobal, struct{ Addr string }]) error {
+						return nil
+					},
+				)
+				r := &recorder{}
+				app.Render(r)
+				res := execute(t, app, tt.giveArgs, nil, nil)
+				assert.NoError(t, res.err, "Execute writes the help")
+				assert.NotNil(t, r.help, "the renderer receives the help")
+				got := map[string]string{}
+				for _, o := range slices.Concat(r.help.Options, r.help.Globals) {
+					got[o.Name] = o.Key
+				}
+				assert.Equal(t, got, tt.want, "the help notes the config key of each option")
+			})
+		}
 	})
 }

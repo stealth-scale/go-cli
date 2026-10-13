@@ -65,10 +65,73 @@ func (a *App[G]) Format(decode Format, exts ...string) {
 	}
 }
 
-// applyConfig reads the config file of the run, and sets the option of each of its keys. It skips
-// a key of an option of another command.
+// IgnoreKeys registers config keys that the app decodes itself. A run skips each such key of the
+// config file and every key below it, so the file can contain a document of the app beside the
+// keys of its options. Dots join the names of the objects of a key, as in the tag key. A later call
+// adds its keys to the keys of the earlier calls.
+//
+// [App.Execute] returns an error that wraps [ErrDeclaration] for a key with an empty name, and for
+// a key that overlaps the config key of an option. Keys overlap when they are equal or when one of
+// them lies inside the other.
+func (a *App[G]) IgnoreKeys(keys ...string) {
+	for _, key := range keys {
+		if slices.Contains(strings.Split(key, keySeparator), "") {
+			a.errs = append(a.errs, fmt.Errorf("%w: the ignored config key %q has an empty name", ErrDeclaration, key))
+			return
+		}
+	}
+	a.ignored = append(a.ignored, keys...)
+}
+
+// LocateConfig registers locate, which returns the path of the config file of a run when neither
+// the flag nor the environment variable of its ConfigFile option sets the path. global contains the
+// global options after their defaults, environment variables and flags, and env is the Env of the
+// run. A search that tests its candidates through env.Open reads only the files of the Env, so a
+// test controls the files that it finds. The ConfigFile option takes the path with the source
+// [Located]. With the empty path the run does not read a config file, and a located path that does
+// not exist fails as an explicit path does. A later call replaces an earlier one.
+//
+// locate runs on the goroutine of [App.Execute], once for each run that needs a path. Runs of the
+// app can call it concurrently, so locate must be safe for concurrent use. It must not change the
+// options. An app with [App.Render] does not apply its sources for the help, so its help does not
+// call locate.
+//
+// [App.Execute] returns an error that wraps [ErrDeclaration] when locate is nil, and the error of
+// locate unchanged.
+func (a *App[G]) LocateConfig(locate func(global *G, env *Env) (string, error)) {
+	if locate == nil {
+		a.errs = append(a.errs, fmt.Errorf("%w: the function that locates the config file is nil", ErrDeclaration))
+		return
+	}
+	a.locate = locate
+}
+
+// checkIgnored returns an error that wraps ErrDeclaration for an ignored key that overlaps the
+// config key of an option of d. Keys overlap when they are equal or when one of them lies inside
+// the other. It compares the keys of the options in their order.
+func (a *App[G]) checkIgnored(d *declaration[G]) error {
+	keys := slices.Sorted(maps.Keys(d.dicts))
+	for _, ignored := range a.ignored {
+		for _, key := range keys {
+			overlap := key == ignored || strings.HasPrefix(key, ignored+keySeparator) ||
+				strings.HasPrefix(ignored, key+keySeparator)
+			if overlap {
+				return fmt.Errorf("%w: the ignored config key %s overlaps the config key %s of an option",
+					ErrDeclaration, ignored, key)
+			}
+		}
+	}
+	return nil
+}
+
+// applyConfig reads the config file of the run, and sets the option of each of its keys in the order
+// of the keys. It skips a key of an option of another command and an ignored key. It applies every
+// valid key and returns the first error, and it skips a file that it cannot read or decode. When
+// neither the flag nor the environment variable of the ConfigFile option sets the path, the
+// function of LocateConfig returns the path.
 //
 // Error modes:
+//   - the error of the function of LocateConfig, unchanged.
 //   - an *Error that wraps ErrConfigFile for a file without a registered format, a file that the
 //     Env cannot read, and a file that its format cannot decode.
 //   - an *Error that wraps ErrUnknownKey for a key that no option of the app declares.
@@ -78,7 +141,21 @@ func (a *App[G]) applyConfig(env *Env, d *declaration[G], in *input[G]) error {
 	if i < 0 {
 		return nil
 	}
-	path, explicit := configPath(env, in, in.list[i])
+	cfg := in.list[i]
+	path, explicit := configPath(env, in, cfg)
+	if !explicit && a.locate != nil {
+		// locate reads the global options of the environment variables and the flags. resolve
+		// applies both again after the file, so it reports the errors of that later pass.
+		_ = in.applyEnv(env)
+		_ = in.applyFlags()
+		located, err := a.locate(d.global, env)
+		if err != nil {
+			return err
+		}
+		cfg.value.SetString(located)
+		cfg.set, cfg.source = true, Source{Kind: Located}
+		path, explicit = located, true
+	}
 	if path == "" {
 		return nil
 	}
@@ -110,7 +187,14 @@ func (a *App[G]) applyConfig(env *Env, d *declaration[G], in *input[G]) error {
 	values := map[string][]string{}
 	flatten("", tree, d.dicts, values)
 	known := slices.Sorted(maps.Keys(d.dicts))
+	var first error
 	for _, key := range slices.Sorted(maps.Keys(values)) {
+		ignored := slices.ContainsFunc(a.ignored, func(ignored string) bool {
+			return key == ignored || strings.HasPrefix(key, ignored+keySeparator)
+		})
+		if ignored {
+			continue
+		}
 		src := Source{Kind: File, Name: key, File: path}
 		j := slices.IndexFunc(in.list, func(o *option) bool { return o.key == key })
 		switch {
@@ -119,11 +203,11 @@ func (a *App[G]) applyConfig(env *Env, d *declaration[G], in *input[G]) error {
 			if len(vals) == 1 {
 				vals = o.split(vals[0])
 			}
-			if err := o.assign(vals, src, false); err != nil {
-				return err
+			if err := o.assign(vals, src, false); first == nil {
+				first = err
 			}
-		case !slices.Contains(known, key):
-			return &Error{
+		case first == nil && !slices.Contains(known, key):
+			first = &Error{
 				Err:        ErrUnknownKey,
 				Input:      key,
 				Source:     src,
@@ -132,7 +216,7 @@ func (a *App[G]) applyConfig(env *Env, d *declaration[G], in *input[G]) error {
 			}
 		}
 	}
-	return nil
+	return first
 }
 
 // configPath returns the path of the config file cfg: its last flag, else its environment variable,

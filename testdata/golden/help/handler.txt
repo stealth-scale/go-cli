@@ -8,4 +8,4 @@ Arguments:
 Options:
       --flag-debug  Print the value and the source of each option before the command runs.  env WC_FLAG_DEBUG
   -h, --help        Show the help.
-  -l, --lines       Count the lines.                                                        env WC_LINES, key lines
+  -l, --lines       Count the lines.                                                        env WC_LINES

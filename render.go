@@ -43,7 +43,7 @@ type HelpOption struct {
 	Text        string // the help text
 	Default     string // the default in quotes such as ":8080" or "***", or empty without one
 	Env         string // the environment variable, or empty
-	Key         string // the config key, or empty
+	Key         string // the config key, or empty without one or on a path without a config file
 	Required    bool   // a run fails when no source sets the option
 }
 
@@ -149,8 +149,8 @@ func (Plain) Debug(w io.Writer, _ []string, rows []DebugRow) error {
 	return nil
 }
 
-// Render registers r as the renderer of the output of the app. A later call replaces an earlier
-// one. An app without a call uses [Plain].
+// Render registers r as the renderer of every run of the app. A later call of Render or
+// [App.RenderFor] replaces an earlier one. An app without a call uses [Plain].
 //
 // [App.Execute] returns an error that wraps [ErrDeclaration] when r is nil.
 func (a *App[G]) Render(r Renderer) {
@@ -158,7 +158,44 @@ func (a *App[G]) Render(r Renderer) {
 		a.errs = append(a.errs, fmt.Errorf("%w: the renderer is nil", ErrDeclaration))
 		return
 	}
-	a.renderer = r
+	a.renderer, a.render = r, nil
+}
+
+// RenderFor registers render as the function that selects the renderer of each run. A run calls
+// render once with its global options. The renderer that render returns writes the help of the
+// run, its table of --flag-debug and the failure that [App.Main] writes. A later call of RenderFor
+// or [App.Render] replaces an earlier one.
+//
+// The run applies every valid value of its sources before it calls render, also when its command
+// line does not scan, has a flag of the help or ends at a command without a handler. The flags
+// count up to the first fault of the command line, and a value that does not convert leaves its
+// option at the value of the earlier sources. A run whose declarations are invalid or whose Env is
+// incomplete passes the zero value of G. [Plain] writes the output of a run whose render returns
+// nil.
+//
+// render runs on the goroutine of [App.Execute] or [App.Main]. Runs of the app can call it
+// concurrently, so render must be safe for concurrent use. It must not keep or change the options.
+//
+// [App.Execute] returns an error that wraps [ErrDeclaration] when render is nil.
+func (a *App[G]) RenderFor(render func(global *G) Renderer) {
+	if render == nil {
+		a.errs = append(a.errs, fmt.Errorf("%w: the function of the renderer is nil", ErrDeclaration))
+		return
+	}
+	a.renderer, a.render = nil, render
+}
+
+// rendererOf returns the renderer of a run with the global options global: the renderer of Render,
+// or the renderer that the function of RenderFor returns. It returns Plain when that function
+// returns nil.
+func (a *App[G]) rendererOf(global *G) Renderer {
+	if a.render == nil {
+		return a.renderer
+	}
+	if r := a.render(global); r != nil {
+		return r
+	}
+	return Plain{}
 }
 
 // plainRows returns the rows of opts in the columns of the help: the flags with the placeholder,

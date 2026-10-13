@@ -28,7 +28,8 @@ func TestKindString(t *testing.T) {
 			{name: "returns environment for Environment", give: cli.Environment, want: "environment"},
 			{name: "returns flag for Flag", give: cli.Flag, want: "flag"},
 			{name: "returns argument for Argument", give: cli.Argument, want: "argument"},
-			{name: "returns the number of a kind past Argument", give: cli.Argument + 1, want: "Kind(5)"},
+			{name: "returns located for Located", give: cli.Located, want: "located"},
+			{name: "returns the number of a kind past Located", give: cli.Located + 1, want: "Kind(6)"},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {

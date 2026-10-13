@@ -91,8 +91,10 @@
 // # Sources
 //
 // A run applies the default, the config file, the environment variable and the flag of each
-// option in that order, so a later source replaces the value of an earlier one. A repeated flag of
-// a slice appends to the values of its earlier occurrences, and of a map adds to their entries.
+// option in that order, so a later source replaces the value of an earlier one. A value that fails
+// leaves its option at the value of the earlier sources, and the run returns the first error. A
+// repeated flag of a slice appends to the values of its earlier occurrences, and of a map adds to
+// their entries.
 // Every source goes through the same conversion and the same checks. [Run.Source] returns the
 // [Source] of a value. The global flag --flag-debug writes the value and the source of every option
 // to the standard error before the handler runs.
@@ -107,7 +109,10 @@
 //
 // The YAML and TOML parsers are in modules of their own, so this module does not require a module
 // outside the standard library. The file nests the keys of each command and of each group in
-// objects. A run fails for a key of the file without an option in the app.
+// objects. A run fails for a key of the file without an option in the app. [App.IgnoreKeys]
+// registers keys that the app decodes itself, and a run skips them. [App.LocateConfig] registers a
+// function that returns the path of the config file when neither the flag nor the environment
+// variable of the option sets it, such as a search from a directory upward.
 //
 // # Input files
 //
@@ -130,7 +135,8 @@
 //
 // The flags -h and --help write the help of the last command of the path. The help lists the
 // options by name and the positional arguments in the order of their fields. It lists the options
-// of the ancestors of a command as its global options.
+// of the ancestors of a command as its global options. It notes the config key of each option only
+// when an option of the path is a config file.
 //
 // # Errors
 //
@@ -143,11 +149,13 @@
 //
 // # Output
 //
-// The [Renderer] of an app writes the help, the [Failure] of a run and the rows of --flag-debug.
-// [App.Render] registers it. An app without a call uses [Plain], which writes plain text in
-// columns. The module go.stealthscale.io/cli/charm renders the same output with Lip Gloss. A
-// renderer receives the environment of the run from [Env.Environ], and [Run.Environ] returns that
-// environment to a handler.
+// The [Renderer] of a run writes the help, the [Failure] of the run and the rows of --flag-debug.
+// [App.Render] registers one renderer for every run. [App.RenderFor] registers a function that
+// selects the renderer of each run from its global options, such as an option of the output format.
+// An app without a call uses [Plain], which writes plain text in columns. The module
+// go.stealthscale.io/cli/charm renders the same output with Lip Gloss. A renderer receives the
+// environment of the run from [Env.Environ], and [Run.Environ] returns that environment to a
+// handler.
 //
 // # Testing
 //

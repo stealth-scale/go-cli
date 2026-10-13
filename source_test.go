@@ -50,9 +50,14 @@ func TestSource(t *testing.T) {
 				want: "default",
 			},
 			{
-				name: "returns the text of the kind for a kind past Argument",
-				give: cli.Source{Kind: cli.Argument + 1, Name: "x"},
-				want: "Kind(5)",
+				name: "returns located for a Located source",
+				give: cli.Source{Kind: cli.Located},
+				want: "located",
+			},
+			{
+				name: "returns the text of the kind for a kind past Located",
+				give: cli.Source{Kind: cli.Located + 1, Name: "x"},
+				want: "Kind(6)",
 			},
 		}
 		for _, tt := range tests {
@@ -71,14 +76,20 @@ func TestSource(t *testing.T) {
 
 			t.Run("reports true for each declared kind", func(t *testing.T) {
 				t.Parallel()
-				prop.True(t, cli.Kind.Valid, "Valid reports true for a declared kind",
-					prop.Using(prop.SampledFrom(cli.Default, cli.File, cli.Environment, cli.Flag, cli.Argument)))
+				prop.True(
+					t,
+					cli.Kind.Valid,
+					"Valid reports true for a declared kind",
+					prop.Using(
+						prop.SampledFrom(cli.Default, cli.File, cli.Environment, cli.Flag, cli.Argument, cli.Located),
+					),
+				)
 			})
 
-			t.Run("reports false for each kind past Argument", func(t *testing.T) {
+			t.Run("reports false for each kind past Located", func(t *testing.T) {
 				t.Parallel()
-				prop.False(t, cli.Kind.Valid, "Valid reports false for a kind past Argument",
-					prop.Using(prop.Integer(cli.Argument+1, 255)))
+				prop.False(t, cli.Kind.Valid, "Valid reports false for a kind past Located",
+					prop.Using(prop.Integer(cli.Located+1, 255)))
 			})
 		})
 	})

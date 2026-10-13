@@ -13,11 +13,12 @@ func _() {
 	_ = x[Environment-2]
 	_ = x[Flag-3]
 	_ = x[Argument-4]
+	_ = x[Located-5]
 }
 
-const _Kind_name = "defaultfileenvironmentflagargument"
+const _Kind_name = "defaultfileenvironmentflagargumentlocated"
 
-var _Kind_index = [...]uint8{0, 7, 11, 22, 26, 34}
+var _Kind_index = [...]uint8{0, 7, 11, 22, 26, 34, 41}
 
 func (i Kind) String() string {
 	idx := int(i) - 0

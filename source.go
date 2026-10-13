@@ -12,8 +12,10 @@ package cli
 // A Kind is a value, which any number of goroutines may read.
 type Kind uint8
 
-// The kinds of source, from the lowest precedence to the highest. A positional argument has a kind
-// of its own, because only the command line sets one.
+// The kinds of source. Default, File, Environment and Flag go from the lowest precedence to the
+// highest. A positional argument has a kind of its own, because only the command line sets one.
+// Located is the kind of the path of a config file that a search of the program returned in place
+// of the default.
 const (
 	// Default is the tag default of a field, or the zero value of a field without one.
 	Default Kind = 0 // default
@@ -25,11 +27,13 @@ const (
 	Flag Kind = 3 // flag
 	// Argument is a positional argument of the command line.
 	Argument Kind = 4 // argument
+	// Located is the path of a config file that the function of [App.LocateConfig] returned.
+	Located Kind = 5 // located
 )
 
 // Valid reports whether k is one of the declared kinds.
 func (k Kind) Valid() bool {
-	return k <= Argument
+	return k <= Located
 }
 
 // Source is the origin of the value of an option. The zero Source is the default of a field.

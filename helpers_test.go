@@ -36,6 +36,15 @@ var (
 	errIO = errors.New("input/output error")
 )
 
+// formatGlobal contains the global options of the app of formats. Format selects the renderer of a
+// run.
+type formatGlobal struct {
+	Levels []int
+	Config cli.ConfigFile `short:"c"`
+	Format string         `          default:"text" enum:"text,json"`
+	Depth  int
+}
+
 // result is the error of one run of an app and what the run wrote.
 type result struct {
 	err    error
@@ -126,6 +135,27 @@ func serving[G, C any](tb assert.TB) (*cli.App[G], *cli.Run[G, C]) {
 		return nil
 	})
 	return app, got
+}
+
+// formats returns the app srv with the global options formatGlobal, the command serve with the
+// options appOptions, and the command db with the subcommand migrate and without a handler. The
+// function of RenderFor appends the options of each call to got. It returns json for the format
+// json and text for any other format.
+func formats(text, json *recorder, got *[]formatGlobal) *cli.App[formatGlobal] {
+	app := cli.New[formatGlobal](appName, appHelp)
+	app.Command(command, commandHelp, func(context.Context, *cli.Run[formatGlobal, appOptions]) error { return nil })
+	db := app.Command[struct{}](parent, parentHelp, nil)
+	db.Command(subcommand, subcommandHelp, func(context.Context, *cli.Run[formatGlobal, struct{}]) error {
+		return nil
+	})
+	app.RenderFor(func(g *formatGlobal) cli.Renderer {
+		*got = append(*got, *g)
+		if g.Format == "json" {
+			return json
+		}
+		return text
+	})
+	return app
 }
 
 // nesting returns the app srv with the global options G, the command db with the options P, and the

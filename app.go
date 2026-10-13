@@ -31,17 +31,21 @@ const (
 // # Concurrency
 //
 // Execute and Main are safe for concurrent use once the last registration has returned. The
-// registrations are the calls of Command, Convert, Format, Handle, Render and Use of the app, and of
-// Command and Use of its commands. They are not safe for concurrent use.
+// registrations are the calls of Command, Convert, Format, Handle, IgnoreKeys, LocateConfig, Render,
+// RenderFor and Use of the app, and of Command and Use of its commands. They are not safe for
+// concurrent use.
 type App[G any] struct {
-	renderer   Renderer                                        // the renderer of the help, the failures and --flag-debug
+	renderer   Renderer                                        // the renderer of Render, or nil after RenderFor
 	converters map[reflect.Type]converter                      // the conversions of Convert, and the built-in ones
 	formats    map[string]Format                               // the formats of config files by their extension in lower case
 	handle     func(ctx context.Context, run *Run[G, G]) error // the handler of the app, or nil
+	render     func(global *G) Renderer                        // the function of RenderFor, or nil after Render
+	locate     func(global *G, env *Env) (string, error)       // the function of LocateConfig, or nil
 	name       string
 	help       string
 	commands   []*command[G] // the commands in the order of their registration
 	hooks      []Hook[G, G]  // the hooks of the app in the order of their registration
+	ignored    []string      // the config keys of IgnoreKeys, which the app decodes itself
 	errs       []error       // the invalid registrations, which Execute returns
 }
 
@@ -107,10 +111,12 @@ func (a *App[G]) Use(hook Hook[G, G]) {
 // nil. A path that ends at a command without a handler writes the help of that command and a blank
 // line to env.Stderr. The blank line separates the help from the failure that [App.Main] writes.
 // The global flag --flag-debug writes the value and the source of each option to env.Stderr before
-// the hooks run. The renderer of the app writes the help and the output of --flag-debug.
+// the hooks run. The renderer of the run writes the help and the output of --flag-debug.
+// [App.RenderFor] describes how a run selects its renderer.
 //
 // Execute checks the options of every command before it reads the command line, so a run of any
-// command reports a declaration that the app cannot run.
+// command reports a declaration that the app cannot run. A run applies every valid value of its
+// sources and returns the first error in the order of the sources.
 //
 // Error modes:
 //   - an error that wraps [ErrEnv] when env is nil, or has no Stdout or no Stderr.
@@ -123,50 +129,17 @@ func (a *App[G]) Use(hook Hook[G, G]) {
 //     write.
 //   - the error of the handler, unchanged, or the error that a hook returns in its place.
 func (a *App[G]) Execute(ctx context.Context, env *Env) error {
-	if err := env.check(); err != nil {
-		return err
-	}
-	d, err := a.declare()
-	if err != nil {
-		return err
-	}
-	in := &input[G]{cmd: d.root, list: d.root.options}
-	if err := in.scan(env.Args); err != nil {
-		return in.locate(err)
-	}
-	if in.help {
-		return a.renderer.Help(env.Stdout, env.environ(), a.helpOf(in))
-	}
-	if in.cmd.handle == nil {
-		if err := a.renderer.Help(env.Stderr, env.environ(), a.helpOf(in)); err != nil {
-			return err
-		}
-		if _, err := io.WriteString(env.Stderr, "\n"); err != nil {
-			return fmt.Errorf("cli: write the help: %w", err)
-		}
-		return in.locate(&Error{Err: ErrMissing, text: "missing command"})
-	}
-	if err := a.resolve(env, d, in); err != nil {
-		return in.locate(err)
-	}
-	if d.debug.value.Bool() {
-		if err := a.renderer.Debug(env.Stderr, env.environ(), debugRows(d, in)); err != nil {
-			return err
-		}
-	}
-	inv := &invocation[G]{global: d.global, env: env, sources: in.sources(), command: in.cmd.path}
-	return in.cmd.around(ctx, inv, func(ctx context.Context) error {
-		return in.cmd.handle(ctx, inv)
-	})
+	_, err := a.run(ctx, env)
+	return err
 }
 
-// Main runs [App.Execute] and returns the exit status for os.Exit. The renderer of the app writes
+// Main runs [App.Execute] and returns the exit status for os.Exit. The renderer of the run writes
 // the [Failure] of an error to env.Stderr. [Plain] writes the name of the app and [Error.Message]
 // for an [*Error], such as "srv: serve: unknown flag --adr (did you mean --addr?)". The status is
 // [ExitUsage] for an error that wraps an *Error, [ExitFailure] for any other error, and [ExitOK]
 // without one. Main does not write the failure to a nil Env or to an Env without Stderr.
 func (a *App[G]) Main(ctx context.Context, env *Env) int {
-	err := a.Execute(ctx, env)
+	r, err := a.run(ctx, env)
 	if err == nil {
 		return ExitOK
 	}
@@ -180,7 +153,59 @@ func (a *App[G]) Main(ctx context.Context, env *Env) int {
 	}
 	if env != nil && env.Stderr != nil {
 		// The status reports the error also when the failure fails to write.
-		_ = a.renderer.Error(env.Stderr, env.environ(), f)
+		_ = r.Error(env.Stderr, env.environ(), f)
 	}
 	return status
+}
+
+// run runs the command line of env as [App.Execute] describes. It returns the error of the run and
+// the renderer of the run, which writes the help, the output of --flag-debug and the failure. A run
+// of an app with [App.RenderFor] applies its sources also when the command line does not scan, has
+// a flag of the help or ends at a command without a handler, so the renderer of such a run comes
+// from the valid values of its sources.
+//
+// Error modes:
+//   - the error modes of [App.Execute].
+func (a *App[G]) run(ctx context.Context, env *Env) (Renderer, error) {
+	if err := env.check(); err != nil {
+		return a.rendererOf(new(G)), err
+	}
+	d, err := a.declare()
+	if err != nil {
+		return a.rendererOf(new(G)), err
+	}
+	in := &input[G]{cmd: d.root, list: d.root.options}
+	err = in.scan(env.Args)
+	switch {
+	case err == nil && !in.help && in.cmd.handle != nil:
+		err = a.resolve(env, d, in)
+	case a.render != nil:
+		// Like a run of an app with Render, this run reports the error of its scan, its help or its
+		// missing command. The errors of this resolution come after those, so the run ignores them.
+		_ = a.resolve(env, d, in)
+	}
+	r := a.rendererOf(d.global)
+	switch {
+	case err != nil:
+		return r, in.locate(err)
+	case in.help:
+		return r, r.Help(env.Stdout, env.environ(), a.helpOf(in))
+	case in.cmd.handle == nil:
+		if err := r.Help(env.Stderr, env.environ(), a.helpOf(in)); err != nil {
+			return r, err
+		}
+		if _, err := io.WriteString(env.Stderr, "\n"); err != nil {
+			return r, fmt.Errorf("cli: write the help: %w", err)
+		}
+		return r, in.locate(&Error{Err: ErrMissing, text: "missing command"})
+	}
+	if d.debug.value.Bool() {
+		if err := r.Debug(env.Stderr, env.environ(), debugRows(d, in)); err != nil {
+			return r, err
+		}
+	}
+	inv := &invocation[G]{global: d.global, env: env, sources: in.sources(), command: in.cmd.path}
+	return r, in.cmd.around(ctx, inv, func(ctx context.Context) error {
+		return in.cmd.handle(ctx, inv)
+	})
 }

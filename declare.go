@@ -120,6 +120,7 @@ func (b *binding[G]) around(ctx context.Context, inv *invocation[G], next func(c
 //   - the errors of options for the global options.
 //   - the errors of walk for the app and its commands.
 //   - the errors of keys for the config keys of the app.
+//   - the errors of checkIgnored for the ignored config keys of the app.
 func (a *App[G]) declare() (*declaration[G], error) {
 	if err := errors.Join(a.errs...); err != nil {
 		return nil, err
@@ -141,6 +142,9 @@ func (a *App[G]) declare() (*declaration[G], error) {
 		return nil, err
 	}
 	if err := d.keys(all); err != nil {
+		return nil, err
+	}
+	if err := a.checkIgnored(d); err != nil {
 		return nil, err
 	}
 	return d, nil

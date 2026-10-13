@@ -32,6 +32,8 @@ const (
 // helpOf returns the help of the last command of the path of in, which is the app before a command.
 // The help lists the subcommands, the positional arguments and the options of the command, and the
 // options of its ancestors as the global options. The flags of the help are options of the app.
+// The options have their config keys only when an option of the path is a config file, because a
+// run without a config file does not read a key.
 func (a *App[G]) helpOf(in *input[G]) *Help {
 	b := in.cmd
 	h := &Help{App: a.name, Command: b.path, Text: b.help, Usage: []string{usageOptions}}
@@ -62,6 +64,13 @@ func (a *App[G]) helpOf(in *input[G]) *Help {
 	}
 	for _, o := range ordered(inherited) {
 		h.Globals = append(h.Globals, o.helpOption())
+	}
+	if !slices.ContainsFunc(slices.Concat(b.options, b.inherited), func(o *option) bool { return o.config }) {
+		for _, opts := range [...][]HelpOption{h.Options, h.Globals} {
+			for i := range opts {
+				opts[i].Key = ""
+			}
+		}
 	}
 	return h
 }

@@ -4,6 +4,7 @@
 package cli_test
 
 import (
+	"context"
 	"strconv"
 	"testing"
 	"testing/fstest"
@@ -29,6 +30,10 @@ type (
 	}
 	listOptions struct {
 		Files []string `arg:""`
+	}
+	levelGlobal struct {
+		Files []string `arg:""`
+		Level int
 	}
 )
 
@@ -196,6 +201,93 @@ func TestResolve(t *testing.T) {
 			res := execute(t, app, []string{command, "src", "dst", "more"}, nil, nil)
 			e := assert.ErrorAs[*cli.Error](t, res.err, "Execute returns an *Error")
 			assert.Equal(t, e.Input, "dst", "the *Error states the first unexpected argument")
+		})
+
+		t.Run("applies the flags after an environment variable that does not convert", func(t *testing.T) {
+			t.Parallel()
+			var got []formatGlobal
+			vars := map[string]string{"SRV_DEPTH": "deep"}
+			res := execute(t, formats(&recorder{}, &recorder{}, &got), []string{"--format", "json", command}, vars, nil)
+			assert.ErrorIs(t, res.err, cli.ErrInvalidValue, "Execute returns ErrInvalidValue")
+			assert.Equal(t, got, []formatGlobal{{Format: "json"}}, "the function of RenderFor receives the flag")
+		})
+
+		t.Run("returns the error of an environment variable before a later valid variable", func(t *testing.T) {
+			t.Parallel()
+			var got []formatGlobal
+			vars := map[string]string{"SRV_LEVELS": "x", "SRV_FORMAT": "json"}
+			res := execute(t, formats(&recorder{}, &recorder{}, &got), []string{command}, vars, nil)
+			e := assert.ErrorAs[*cli.Error](t, res.err, "Execute returns an *Error")
+			assert.Equal(t, e.Source, cli.Source{Kind: cli.Environment, Name: "SRV_LEVELS"},
+				"the error is the error of the first variable")
+		})
+
+		t.Run("returns the error of an environment variable before the error of a flag", func(t *testing.T) {
+			t.Parallel()
+			var got []formatGlobal
+			vars := map[string]string{"SRV_FORMAT": "xml"}
+			res := execute(t, formats(&recorder{}, &recorder{}, &got), []string{"--depth", "deep", command}, vars, nil)
+			e := assert.ErrorAs[*cli.Error](t, res.err, "Execute returns an *Error")
+			assert.Equal(t, e.Source, cli.Source{Kind: cli.Environment, Name: "SRV_FORMAT"},
+				"the error is the error of the variable")
+		})
+
+		t.Run("replaces the values of a variable with the next flag after a flag that does not convert",
+			func(t *testing.T) {
+				t.Parallel()
+				var got []formatGlobal
+				args := []string{"--levels", "x", "--levels", "3", command}
+				vars := map[string]string{"SRV_LEVELS": "1,2"}
+				res := execute(t, formats(&recorder{}, &recorder{}, &got), args, vars, nil)
+				assert.ErrorIs(t, res.err, cli.ErrInvalidValue, "Execute returns ErrInvalidValue")
+				assert.Equal(t, got, []formatGlobal{{Levels: []int{3}, Format: "text"}},
+					"the list has the value of the next flag alone")
+			})
+
+		t.Run("applies the positional arguments after a flag that does not convert", func(t *testing.T) {
+			t.Parallel()
+			var got levelGlobal
+			app := cli.New[levelGlobal](appName, appHelp)
+			app.Handle(func(context.Context, *cli.Run[levelGlobal, levelGlobal]) error { return nil })
+			app.RenderFor(func(g *levelGlobal) cli.Renderer {
+				got = *g
+				return &recorder{}
+			})
+			res := execute(t, app, []string{"--level", "x", "a.txt"}, nil, nil)
+			assert.ErrorIs(t, res.err, cli.ErrInvalidValue, "Execute returns ErrInvalidValue")
+			assert.Equal(t, got.Files, []string{"a.txt"}, "the function of RenderFor receives the argument")
+		})
+
+		t.Run("returns the error of a flag before the error of an unexpected argument", func(t *testing.T) {
+			t.Parallel()
+			app, _ := serving[resolveGlobal, struct {
+				Source string `arg:""`
+				Port   int
+			}](t)
+			res := execute(t, app, []string{command, "--port", "x", "src", "dst"}, nil, nil)
+			assert.ErrorIs(t, res.err, cli.ErrInvalidValue, "Execute returns the error of the flag")
+		})
+
+		t.Run("returns the error of a flag before the error of a positional argument", func(t *testing.T) {
+			t.Parallel()
+			app, _ := serving[resolveGlobal, struct {
+				Count int `arg:""`
+				Port  int
+			}](t)
+			res := execute(t, app, []string{command, "--port", "x", "many"}, nil, nil)
+			e := assert.ErrorAs[*cli.Error](t, res.err, "Execute returns an *Error")
+			assert.Equal(t, e.Input, "--port", "the error is the error of the flag")
+		})
+
+		t.Run("returns the error of the config file before the error of an environment variable", func(t *testing.T) {
+			t.Parallel()
+			var got []formatGlobal
+			files := fstest.MapFS{configPath: {Data: []byte(`{"depth": "deep"}`)}}
+			vars := map[string]string{"SRV_FORMAT": "xml"}
+			res := execute(t, formats(&recorder{}, &recorder{}, &got), []string{"-c", configPath, command}, vars, files)
+			e := assert.ErrorAs[*cli.Error](t, res.err, "Execute returns an *Error")
+			assert.Equal(t, e.Source, cli.Source{Kind: cli.File, Name: "depth", File: configPath},
+				"the error is the error of the key")
 		})
 	})
 }

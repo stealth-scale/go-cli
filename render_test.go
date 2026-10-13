@@ -7,9 +7,13 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io/fs"
 	"testing"
+	"testing/fstest"
 
 	"go.dokimi.dev/assert"
+	"go.dokimi.dev/assert/expect"
+	"go.dokimi.dev/assert/prop"
 
 	"go.stealthscale.io/cli"
 )
@@ -193,6 +197,262 @@ func TestRender(t *testing.T) {
 			assert.Equal(t, status, cli.ExitFailure, "Main returns ExitFailure")
 			assert.Equal(t, stderr.String(), "srv: cli: invalid declaration: the renderer is nil\n",
 				"Main writes the error with Plain")
+		})
+
+		t.Run("uses the renderer of a later call after RenderFor", func(t *testing.T) {
+			t.Parallel()
+			var got []formatGlobal
+			app := formats(&recorder{}, &recorder{}, &got)
+			last := &recorder{}
+			app.Render(last)
+			res := execute(t, app, []string{"-h"}, nil, nil)
+			assert.NoError(t, res.err, "Execute writes the help")
+			assert.Empty(t, got, "the run does not call the function of RenderFor")
+			assert.NotNil(t, last.help, "the renderer of the later call receives the help")
+		})
+
+		opens := []struct {
+			name     string
+			giveArgs []string
+		}{
+			{name: "opens no config file for the help", giveArgs: []string{"-c", "srv.json", "-h"}},
+			{name: "opens no config file after a failed scan", giveArgs: []string{"-c", "srv.json", "--bogus"}},
+			{
+				name:     "opens no config file for a command without a handler",
+				giveArgs: []string{"-c", "srv.json", parent},
+			},
+		}
+		for _, tt := range opens {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+				var got []formatGlobal
+				app := formats(&recorder{}, &recorder{}, &got)
+				app.Render(&recorder{})
+				opened := 0
+				files := fstest.MapFS{"srv.json": {Data: []byte("{}")}}
+				var out bytes.Buffer
+				env := &cli.Env{
+					Open: func(name string) (fs.File, error) {
+						opened++
+						return files.Open(name)
+					},
+					Stdout: &out,
+					Stderr: &out,
+					Args:   tt.giveArgs,
+				}
+				app.Main(t.Context(), env)
+				assert.Equal(t, opened, 0, "the run opens no file")
+			})
+		}
+	})
+
+	t.Run("RenderFor", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name      string
+			giveArgs  []string
+			giveVars  map[string]string
+			giveFiles fstest.MapFS
+			wantJSON  bool
+		}{
+			{
+				name:     "writes the failure of a scan with the renderer of a flag before the fault",
+				giveArgs: []string{"--format", "json", command, "--bogus"},
+				wantJSON: true,
+			},
+			{
+				name:     "writes the failure of a scan with the renderer of the default for a flag after the fault",
+				giveArgs: []string{command, "--bogus", "--format", "json"},
+			},
+			{
+				name:     "writes the failure of a value with the renderer of the earlier sources",
+				giveArgs: []string{"--format", "xml", command},
+				giveVars: map[string]string{"SRV_FORMAT": "json"},
+				wantJSON: true,
+			},
+			{
+				name:     "writes the help with the renderer of the sources",
+				giveArgs: []string{"--format", "json", "--help"},
+				wantJSON: true,
+			},
+			{
+				name:     "writes the help of a command without a handler with the renderer of the sources",
+				giveArgs: []string{"--format", "json", parent},
+				wantJSON: true,
+			},
+			{
+				name:     "writes the table of --flag-debug with the renderer of the sources",
+				giveArgs: []string{"--format", "json", "--flag-debug", command},
+				wantJSON: true,
+			},
+			{
+				name:      "writes the failure of a config file that does not decode with the renderer of the flags",
+				giveArgs:  []string{"-c", "bad.json", "--format", "json", command},
+				giveFiles: fstest.MapFS{"bad.json": {Data: []byte("{")}},
+				wantJSON:  true,
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+				text, json := &recorder{}, &recorder{}
+				var got []formatGlobal
+				var out bytes.Buffer
+				env := &cli.Env{
+					Lookup: cli.Vars(tt.giveVars),
+					Open:   tt.giveFiles.Open,
+					Stdout: &out,
+					Stderr: &out,
+					Args:   tt.giveArgs,
+				}
+				formats(text, json, &got).Main(t.Context(), env)
+				want, other := text, json
+				if tt.wantJSON {
+					want, other = json, text
+				}
+				assert.Length(t, got, 1, "the run calls the function once")
+				expect.NotEqual(t, *want, recorder{}, "the renderer of the format receives the output")
+				expect.Equal(t, *other, recorder{}, "the renderer of the other format receives nothing")
+			})
+		}
+
+		t.Run("passes the global options of a run to the function", func(t *testing.T) {
+			t.Parallel()
+			var got []formatGlobal
+			args := []string{"--format", "json", "--depth", "3", command}
+			res := execute(t, formats(&recorder{}, &recorder{}, &got), args, nil, nil)
+			assert.NoError(t, res.err, "Execute runs the command")
+			assert.Equal(
+				t,
+				got,
+				[]formatGlobal{{Format: "json", Depth: 3}},
+				"the function receives the options of the run",
+			)
+		})
+
+		t.Run("passes the zero value of the global options for invalid declarations", func(t *testing.T) {
+			t.Parallel()
+			text, json := &recorder{}, &recorder{}
+			var got []formatGlobal
+			app := formats(text, json, &got)
+			app.Command("bad", "", func(context.Context, *cli.Run[formatGlobal, chan int]) error { return nil })
+			var out bytes.Buffer
+			args := []string{"--format", "json", command}
+			status := app.Main(t.Context(), &cli.Env{Stdout: &out, Stderr: &out, Args: args})
+			assert.Equal(t, status, cli.ExitFailure, "Main returns ExitFailure")
+			assert.Equal(t, got, []formatGlobal{{}}, "the function receives the zero value of the options")
+			assert.NotNil(t, text.failure, "the renderer of the zero value receives the failure")
+			assert.ErrorIs(t, text.failure.Err, cli.ErrDeclaration, "the failure is the error of the declarations")
+		})
+
+		t.Run("passes the zero value of the global options for an Env without Stdout", func(t *testing.T) {
+			t.Parallel()
+			var got []formatGlobal
+			var stderr bytes.Buffer
+			env := &cli.Env{Stderr: &stderr, Args: []string{"--format", "json", command}}
+			status := formats(&recorder{}, &recorder{}, &got).Main(t.Context(), env)
+			assert.Equal(t, status, cli.ExitFailure, "Main returns ExitFailure")
+			assert.Equal(t, got, []formatGlobal{{}}, "the function receives the zero value of the options")
+		})
+
+		t.Run("returns ErrDeclaration for a nil function", func(t *testing.T) {
+			t.Parallel()
+			app, _ := serving[formatGlobal, appOptions](t)
+			app.RenderFor(nil)
+			res := execute(t, app, []string{command}, nil, nil)
+			assert.ErrorIs(t, res.err, cli.ErrDeclaration, "Execute returns ErrDeclaration")
+			assert.Equal(t, res.err.Error(), "cli: invalid declaration: the function of the renderer is nil",
+				"the error names the function of the renderer")
+		})
+
+		t.Run("writes the output of a run with Plain when the function returns nil", func(t *testing.T) {
+			t.Parallel()
+			app, _ := serving[formatGlobal, appOptions](t)
+			app.RenderFor(func(*formatGlobal) cli.Renderer { return nil })
+			var stdout, stderr bytes.Buffer
+			args := []string{command, "--bogus"}
+			status := app.Main(t.Context(), &cli.Env{Stdout: &stdout, Stderr: &stderr, Args: args})
+			assert.Equal(t, status, cli.ExitUsage, "Main returns ExitUsage")
+			assert.Equal(t, stderr.String(), "srv: serve: unknown flag --bogus\n", "Plain writes the failure")
+		})
+
+		t.Run("replaces the renderer of an earlier Render", func(t *testing.T) {
+			t.Parallel()
+			first, last := &recorder{}, &recorder{}
+			app := rendering(first, nil)
+			app.RenderFor(func(*appGlobal) cli.Renderer { return last })
+			res := execute(t, app, []string{"-h"}, nil, nil)
+			assert.NoError(t, res.err, "Execute writes the help")
+			assert.Nil(t, first.help, "the renderer of Render receives nothing")
+			assert.NotNil(t, last.help, "the renderer of RenderFor receives the help")
+		})
+
+		t.Run("keeps the renderer of a run when a hook changes the global options", func(t *testing.T) {
+			t.Parallel()
+			text, json := &recorder{}, &recorder{}
+			var got []formatGlobal
+			app := formats(text, json, &got)
+			app.Use(
+				func(_ context.Context, run *cli.Run[formatGlobal, formatGlobal], _ func(context.Context) error) error {
+					run.Global().Format = "json"
+					return errHandler
+				},
+			)
+			var out bytes.Buffer
+			status := app.Main(t.Context(), &cli.Env{Stdout: &out, Stderr: &out, Args: []string{command}})
+			assert.Equal(t, status, cli.ExitFailure, "Main returns ExitFailure")
+			assert.NotNil(t, text.failure, "the renderer of the sources receives the failure")
+			assert.Equal(t, *json, recorder{}, "the renderer of the format of the hook receives nothing")
+		})
+
+		t.Run("opens the config file for the help", func(t *testing.T) {
+			t.Parallel()
+			var got []formatGlobal
+			app := formats(&recorder{}, &recorder{}, &got)
+			opened := 0
+			files := fstest.MapFS{"srv.json": {Data: []byte(`{"format": "json"}`)}}
+			var out bytes.Buffer
+			env := &cli.Env{
+				Open: func(name string) (fs.File, error) {
+					opened++
+					return files.Open(name)
+				},
+				Stdout: &out,
+				Stderr: &out,
+				Args:   []string{"-c", "srv.json", "-h"},
+			}
+			assert.NoError(t, app.Execute(t.Context(), env), "Execute writes the help")
+			assert.Equal(t, opened, 1, "the run opens the config file once")
+			assert.Equal(t, got, []formatGlobal{{Config: "srv.json", Format: "json"}},
+				"the function receives the format of the file")
+		})
+
+		t.Run("returns the error of the same app with Render for any command line", func(t *testing.T) {
+			t.Parallel()
+			files := fstest.MapFS{
+				"srv.json": {Data: []byte(`{"format": "json", "bogus": 1}`)},
+				"bad.json": {Data: []byte("{")},
+			}
+			token := prop.OneOf(
+				prop.SampledFrom(command, parent, subcommand, "--format", "json", "xml", "--format=json", "-c",
+					"srv.json", "bad.json", "--depth", "x", "--levels", "--bogus", "-h", "--flag-debug", "--", "-p"),
+				prop.String(prop.MaxSize(6)),
+			)
+			prop.ForAll(t, "RenderFor does not change the error of a run", func(c *prop.Case) {
+				args := c.Draw(prop.List(token, prop.MaxSize(8)), "args")
+				var got []formatGlobal
+				selecting := formats(&recorder{}, &recorder{}, &got)
+				fixed := formats(&recorder{}, &recorder{}, &got)
+				fixed.Render(&recorder{})
+				var out bytes.Buffer
+				want := fixed.Execute(c.Context(), &cli.Env{Open: files.Open, Stdout: &out, Stderr: &out, Args: args})
+				err := selecting.Execute(
+					c.Context(),
+					&cli.Env{Open: files.Open, Stdout: &out, Stderr: &out, Args: args},
+				)
+				assert.Equal(c, err, want, "the app with RenderFor returns the error of the app with Render")
+			})
 		})
 	})
 
