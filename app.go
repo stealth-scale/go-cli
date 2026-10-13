@@ -129,44 +129,23 @@ func (a *App[G]) Use(hook Hook[G, G]) {
 //     write.
 //   - the error of the handler, unchanged, or the error that a hook returns in its place.
 func (a *App[G]) Execute(ctx context.Context, env *Env) error {
-	_, err := a.run(ctx, env)
+	_, err := a.ExecuteRenderer(ctx, env)
 	return err
 }
 
-// Main runs [App.Execute] and returns the exit status for os.Exit. The renderer of the run writes
-// the [Failure] of an error to env.Stderr. [Plain] writes the name of the app and [Error.Message]
-// for an [*Error], such as "srv: serve: unknown flag --adr (did you mean --addr?)". The status is
-// [ExitUsage] for an error that wraps an *Error, [ExitFailure] for any other error, and [ExitOK]
-// without one. Main does not write the failure to a nil Env or to an Env without Stderr.
-func (a *App[G]) Main(ctx context.Context, env *Env) int {
-	r, err := a.run(ctx, env)
-	if err == nil {
-		return ExitOK
-	}
-	status := ExitFailure
-	f := &Failure{Err: err, App: a.name, Message: err.Error()}
-	if e, ok := errors.AsType[*Error](err); ok {
-		status, f.Usage = ExitUsage, true
-		if e.Error() == f.Message {
-			f.Command, f.Message, f.Suggestion = e.Command, e.text, e.Suggestion
-		}
-	}
-	if env != nil && env.Stderr != nil {
-		// The status reports the error also when the failure fails to write.
-		_ = r.Error(env.Stderr, env.environ(), f)
-	}
-	return status
-}
-
-// run runs the command line of env as [App.Execute] describes. It returns the error of the run and
-// the renderer of the run, which writes the help, the output of --flag-debug and the failure. A run
-// of an app with [App.RenderFor] applies its sources also when the command line does not scan, has
-// a flag of the help or ends at a command without a handler, so the renderer of such a run comes
-// from the valid values of its sources.
+// ExecuteRenderer runs the command line of env as [App.Execute] describes, and also returns the
+// renderer of the run. The renderer has written the help and the table of --flag-debug of the run.
+// A caller that writes the failure of the run itself passes [App.Failure] of the error to the method
+// Error of the renderer, as [App.Main] does. ExecuteRenderer returns the renderer of every run,
+// also of a run whose Env is incomplete or whose declarations are invalid.
+//
+// A run of an app with [App.RenderFor] applies its sources also when the command line does not
+// scan, has a flag of the help or ends at a command without a handler, so the renderer of such a run
+// comes from the valid values of its sources.
 //
 // Error modes:
 //   - the error modes of [App.Execute].
-func (a *App[G]) run(ctx context.Context, env *Env) (Renderer, error) {
+func (a *App[G]) ExecuteRenderer(ctx context.Context, env *Env) (Renderer, error) {
 	if err := env.check(); err != nil {
 		return a.rendererOf(new(G)), err
 	}
@@ -208,4 +187,43 @@ func (a *App[G]) run(ctx context.Context, env *Env) (Renderer, error) {
 	return r, in.cmd.around(ctx, inv, func(ctx context.Context) error {
 		return in.cmd.handle(ctx, inv)
 	})
+}
+
+// Main runs [App.ExecuteRenderer] and returns the exit status for os.Exit. The renderer of the run
+// writes the failure that [App.Failure] returns for an error to env.Stderr. [Plain] writes the name
+// of the app and [Error.Message] for an [*Error], such as
+// "srv: serve: unknown flag --adr (did you mean --addr?)". The status is [ExitUsage] for an error
+// that wraps an *Error, [ExitFailure] for any other error, and [ExitOK] without one. Main does not
+// write the failure to a nil Env or to an Env without Stderr.
+func (a *App[G]) Main(ctx context.Context, env *Env) int {
+	r, err := a.ExecuteRenderer(ctx, env)
+	f := a.Failure(err)
+	if f == nil {
+		return ExitOK
+	}
+	if env != nil && env.Stderr != nil {
+		// The status reports the error also when the failure fails to write.
+		_ = r.Error(env.Stderr, env.environ(), f)
+	}
+	if f.Usage {
+		return ExitUsage
+	}
+	return ExitFailure
+}
+
+// Failure returns the failure that [App.Main] writes for the error err of a run, or nil for a nil
+// error. Usage is true for an error that wraps an [*Error]. For an *Error itself, Command, Message
+// and Suggestion come from the *Error. For any other error, Message is the text of the error.
+func (a *App[G]) Failure(err error) *Failure {
+	if err == nil {
+		return nil
+	}
+	f := &Failure{Err: err, App: a.name, Message: err.Error()}
+	if e, ok := errors.AsType[*Error](err); ok {
+		f.Usage = true
+		if e.Error() == f.Message {
+			f.Command, f.Message, f.Suggestion = e.Command, e.text, e.Suggestion
+		}
+	}
+	return f
 }

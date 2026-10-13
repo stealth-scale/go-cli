@@ -485,6 +485,42 @@ func TestApp(t *testing.T) {
 		})
 	})
 
+	t.Run("ExecuteRenderer", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("returns the error of a run beside the renderer of Render", func(t *testing.T) {
+			t.Parallel()
+			r := &recorder{}
+			var out bytes.Buffer
+			env := &cli.Env{Stdout: &out, Stderr: &out, Args: []string{command}}
+			got, err := rendering(r, errHandler).ExecuteRenderer(t.Context(), env)
+			assert.Equal(t, err, errHandler, "ExecuteRenderer returns the error of the handler", assert.ByIdentity())
+			assert.Equal(t, got, cli.Renderer(r), "ExecuteRenderer returns the renderer of Render", assert.ByIdentity())
+		})
+
+		t.Run("returns the error of a failed scan beside the renderer of its format", func(t *testing.T) {
+			t.Parallel()
+			text, json := &recorder{}, &recorder{}
+			var got []formatGlobal
+			var out bytes.Buffer
+			env := &cli.Env{Stdout: &out, Stderr: &out, Args: []string{"--format", "json", command, "--bogus"}}
+			r, err := formats(text, json, &got).ExecuteRenderer(t.Context(), env)
+			assert.ErrorIs(t, err, cli.ErrUnknownFlag, "ExecuteRenderer returns the error of the scan")
+			assert.Equal(t, r, cli.Renderer(json), "ExecuteRenderer returns the renderer of the format",
+				assert.ByIdentity())
+		})
+
+		t.Run("returns Plain when the function of RenderFor returns nil", func(t *testing.T) {
+			t.Parallel()
+			app, _ := serving[formatGlobal, appOptions](t)
+			app.RenderFor(func(*formatGlobal) cli.Renderer { return nil })
+			var out bytes.Buffer
+			r, err := app.ExecuteRenderer(t.Context(), &cli.Env{Stdout: &out, Stderr: &out, Args: []string{command}})
+			assert.NoError(t, err, "ExecuteRenderer runs the command")
+			assert.Equal(t, r, cli.Renderer(cli.Plain{}), "ExecuteRenderer returns Plain")
+		})
+	})
+
 	t.Run("Main", func(t *testing.T) {
 		t.Parallel()
 
@@ -551,6 +587,43 @@ func TestApp(t *testing.T) {
 			status := app.Main(t.Context(), &cli.Env{Stdout: &stdout, Args: []string{command}})
 			assert.Equal(t, status, cli.ExitFailure, "Main returns ExitFailure")
 			assert.Empty(t, stdout.String(), "Main writes nothing")
+		})
+	})
+
+	t.Run("Failure", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("returns nil for a nil error", func(t *testing.T) {
+			t.Parallel()
+			app, _ := serving[appGlobal, appOptions](t)
+			assert.Nil(t, app.Failure(nil), "Failure returns nil")
+		})
+
+		t.Run("returns the command, the message and the suggestion of an *Error", func(t *testing.T) {
+			t.Parallel()
+			app, _ := serving[appGlobal, appOptions](t)
+			res := execute(t, app, []string{command, "--prot", "8"}, nil, nil)
+			assert.Equal(t, app.Failure(res.err), &cli.Failure{
+				Err: res.err, App: appName, Command: command, Message: "unknown flag --prot", Suggestion: "--port",
+				Usage: true,
+			}, "Failure returns the parts of the *Error")
+		})
+
+		t.Run("returns the text of an error that wraps an *Error", func(t *testing.T) {
+			t.Parallel()
+			app, _ := serving[appGlobal, appOptions](t)
+			err := errors.Join(errHandler, &cli.Error{Err: cli.ErrMissing, Command: "migrate"})
+			assert.Equal(t, app.Failure(err), &cli.Failure{
+				Err: err, App: appName, Message: "main: the store is down\ncli: migrate: ", Usage: true,
+			}, "Failure returns the text of the whole error")
+		})
+
+		t.Run("returns the text of any other error", func(t *testing.T) {
+			t.Parallel()
+			app, _ := serving[appGlobal, appOptions](t)
+			assert.Equal(t, app.Failure(errHandler), &cli.Failure{
+				Err: errHandler, App: appName, Message: "main: the store is down",
+			}, "Failure returns the text of the error")
 		})
 	})
 }

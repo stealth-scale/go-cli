@@ -145,7 +145,9 @@
 // [ErrMissing], [ErrInvalidValue], [ErrUnexpectedArgument] and [ErrConfigFile]. It returns an error
 // that wraps [ErrDeclaration] for a registration or options that the app cannot run, and
 // [ErrEnv] for an incomplete [Env]. [App.Main] writes the error and returns [ExitUsage] or
-// [ExitFailure].
+// [ExitFailure]. [App.ExecuteRenderer] returns the renderer of a run beside its error, and
+// [App.Failure] returns the [Failure] that Main writes, so a program with exit statuses or streams
+// of its own writes the failure itself.
 //
 // # Output
 //
