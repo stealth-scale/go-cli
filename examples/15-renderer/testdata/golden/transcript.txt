@@ -2,6 +2,14 @@ $ stock count bolts
 bolts: 12 in main
 [exit 0]
 
+$ stock --format json count bolts
+{
+  "item": "bolts",
+  "warehouse": "main",
+  "count": 12
+}
+[exit 0]
+
 $ stock count --help
 Usage: stock count [options] ITEM
 
@@ -11,14 +19,15 @@ Arguments:
       ITEM  Item to count.
 
 Options:
-  -w, --warehouse string  Warehouse of the item.  default "main", env STOCK_COUNT_WAREHOUSE, key count.warehouse
+  -w, --warehouse string  Warehouse of the item.  default "main", env STOCK_COUNT_WAREHOUSE
 
 Global options:
-      --flag-debug  Print the value and the source of each option before the command runs.  env STOCK_FLAG_DEBUG
-  -h, --help        Show the help.
+      --flag-debug        Print the value and the source of each option before the command runs.  env STOCK_FLAG_DEBUG
+      --format text|json  Output format.                                                          default "text", env STOCK_FORMAT
+  -h, --help              Show the help.
 [exit 0]
 
-$ OUTPUT=json stock count --help
+$ stock --format json count --help
 {
   "App": "stock",
   "Command": "count",
@@ -48,7 +57,7 @@ $ OUTPUT=json stock count --help
       "Text": "Warehouse of the item.",
       "Default": "\"main\"",
       "Env": "STOCK_COUNT_WAREHOUSE",
-      "Key": "count.warehouse",
+      "Key": "",
       "Required": false
     }
   ],
@@ -60,6 +69,16 @@ $ OUTPUT=json stock count --help
       "Text": "Print the value and the source of each option before the command runs.",
       "Default": "",
       "Env": "STOCK_FLAG_DEBUG",
+      "Key": "",
+      "Required": false
+    },
+    {
+      "Name": "--format",
+      "Short": "",
+      "Placeholder": "text|json",
+      "Text": "Output format.",
+      "Default": "\"text\"",
+      "Env": "STOCK_FORMAT",
       "Key": "",
       "Required": false
     },
@@ -81,7 +100,7 @@ $ stock count
 stock: count: missing argument ITEM
 [exit 2]
 
-$ OUTPUT=json stock count
+$ stock --format json count
 {
   "app": "stock",
   "command": "count",
@@ -90,7 +109,7 @@ $ OUTPUT=json stock count
 }
 [exit 2]
 
-$ OUTPUT=json stock cuont bolts
+$ stock --format json cuont bolts
 {
   "app": "stock",
   "message": "unknown command \"cuont\"",
@@ -99,8 +118,28 @@ $ OUTPUT=json stock cuont bolts
 }
 [exit 2]
 
-$ OUTPUT=json stock count bolts -w east --flag-debug
+# The variable selects the format of a run whose command line fails.
+$ STOCK_FORMAT=json stock count bolts --bogus
+{
+  "app": "stock",
+  "command": "count",
+  "message": "unknown flag --bogus",
+  "usage": true
+}
+[exit 2]
+
+# A flag after the first fault does not count.
+$ stock count bolts --bogus --format json
+stock: count: unknown flag --bogus
+[exit 2]
+
+$ stock --format json count bolts -w east --flag-debug
 [
+  {
+    "option": "--format",
+    "value": "\"json\"",
+    "source": "flag --format"
+  },
   {
     "option": "--warehouse",
     "value": "\"east\"",
@@ -112,5 +151,9 @@ $ OUTPUT=json stock count bolts -w east --flag-debug
     "source": "argument ITEM"
   }
 ]
-bolts: 12 in east
+{
+  "item": "bolts",
+  "warehouse": "east",
+  "count": 12
+}
 [exit 0]

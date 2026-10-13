@@ -1,19 +1,23 @@
 // Copyright Stealth Scale B.V. 2026
 // SPDX-License-Identifier: MIT
 
-// Command renderer is a program with a renderer of its own.
+// Command renderer is a program whose option --format selects its renderer.
 //
-//	OUTPUT=json go run ./15-renderer count --help
+//	go run ./15-renderer --format json count --help
 //
-// The renderer embeds cli.Plain and replaces its three methods. Each method writes JSON when the
-// environment of the run contains OUTPUT=json, and calls the method of cli.Plain otherwise:
+// App.RenderFor registers a function that selects the renderer of each run from the global options
+// of the run. The function returns jsonRenderer for the format json and cli.Plain for the format
+// text. jsonRenderer writes JSON:
 //   - Help writes the cli.Help of the app or of a command, with its cli.HelpCommand and
 //     cli.HelpOption values.
 //   - Error writes the cli.Failure of a run without its error.
 //   - Debug writes the cli.DebugRow values of --flag-debug with each source as text.
 //
-// App.Render registers the renderer. A renderer receives the environment of the run, so a test
-// selects the output through the variables of its input.
+// A run applies the valid values of its sources before the function selects the renderer, so the
+// usage error of a command line with --format json is JSON. The flags count up to the first fault
+// of the command line, so a --format json after an unknown flag does not select JSON. The variable
+// STOCK_FORMAT selects the format of every run. The handler of count writes its result in the
+// format of the run too.
 package main
 
 import (
@@ -22,13 +26,20 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"slices"
 
 	"go.stealthscale.io/cli"
 )
 
-// jsonOutput is the pair of the environment that selects the output in JSON.
-const jsonOutput = "OUTPUT=json"
+// jsonFormat is the value of the option --format that selects JSON.
+const jsonFormat = "json"
+
+// items is the number of every item in every warehouse.
+const items = 12
+
+// Global contains the options of every command.
+type Global struct {
+	Format string `help:"Output format." default:"text" enum:"text,json"`
+}
 
 // Count contains the options of the command count.
 type Count struct {
@@ -36,11 +47,8 @@ type Count struct {
 	Warehouse string `help:"Warehouse of the item."        default:"main" short:"w"`
 }
 
-// jsonRenderer is a cli.Renderer that writes the output of the app as JSON when the environment of a
-// run contains OUTPUT=json. Otherwise it writes the text of the embedded cli.Plain.
-type jsonRenderer struct {
-	cli.Plain
-}
+// jsonRenderer is a cli.Renderer that writes the output of the app as JSON.
+type jsonRenderer struct{}
 
 // failure is the JSON form of a cli.Failure. It leaves out the error, whose text Message contains.
 type failure struct {
@@ -58,22 +66,37 @@ type row struct {
 	Source string `json:"source"`
 }
 
+// result is the JSON form of the result of the command count.
+type result struct {
+	Item      string `json:"item"`
+	Warehouse string `json:"warehouse"`
+	Count     int    `json:"count"`
+}
+
 func main() {
 	os.Exit(app().Main(context.Background(), cli.OS()))
 }
 
-// app returns the program stock with the command count. jsonRenderer writes its output.
-func app() *cli.App[struct{}] {
-	a := cli.New[struct{}]("stock", "Count the items of the warehouses.")
-	a.Render(jsonRenderer{})
+// app returns the program stock with the command count. The option --format selects its renderer.
+func app() *cli.App[Global] {
+	a := cli.New[Global]("stock", "Count the items of the warehouses.")
+	a.RenderFor(func(g *Global) cli.Renderer {
+		if g.Format == jsonFormat {
+			return jsonRenderer{}
+		}
+		return cli.Plain{}
+	})
 	a.Command("count", "Count an item in a warehouse.", count)
 	return a
 }
 
-// count writes the number of the item in the warehouse.
-func count(_ context.Context, run *cli.Run[struct{}, Count]) error {
+// count writes the number of the item in the warehouse, as JSON for the format json.
+func count(_ context.Context, run *cli.Run[Global, Count]) error {
 	c := run.Config()
-	if _, err := fmt.Fprintf(run.Stdout(), "%s: 12 in %s\n", c.Item, c.Warehouse); err != nil {
+	if run.Global().Format == jsonFormat {
+		return encode(run.Stdout(), &result{Item: c.Item, Warehouse: c.Warehouse, Count: items})
+	}
+	if _, err := fmt.Fprintf(run.Stdout(), "%s: %d in %s\n", c.Item, items, c.Warehouse); err != nil {
 		return fmt.Errorf("main: write the count: %w", err)
 	}
 	return nil
@@ -89,30 +112,21 @@ func encode(w io.Writer, v any) error {
 	return nil
 }
 
-// Help writes h as JSON, or as the text of cli.Plain.
-func (r jsonRenderer) Help(w io.Writer, environ []string, h *cli.Help) error {
-	if !slices.Contains(environ, jsonOutput) {
-		return r.Plain.Help(w, environ, h)
-	}
+// Help writes h as JSON.
+func (jsonRenderer) Help(w io.Writer, _ []string, h *cli.Help) error {
 	return encode(w, h)
 }
 
-// Error writes the failure f as JSON, or as the line of cli.Plain.
-func (r jsonRenderer) Error(w io.Writer, environ []string, f *cli.Failure) error {
-	if !slices.Contains(environ, jsonOutput) {
-		return r.Plain.Error(w, environ, f)
-	}
+// Error writes the failure f as JSON.
+func (jsonRenderer) Error(w io.Writer, _ []string, f *cli.Failure) error {
 	return encode(
 		w,
-		failure{App: f.App, Command: f.Command, Message: f.Message, Suggestion: f.Suggestion, Usage: f.Usage},
+		&failure{App: f.App, Command: f.Command, Message: f.Message, Suggestion: f.Suggestion, Usage: f.Usage},
 	)
 }
 
-// Debug writes the rows of --flag-debug as JSON, or as the table of cli.Plain.
-func (r jsonRenderer) Debug(w io.Writer, environ []string, rows []cli.DebugRow) error {
-	if !slices.Contains(environ, jsonOutput) {
-		return r.Plain.Debug(w, environ, rows)
-	}
+// Debug writes the rows of --flag-debug as JSON.
+func (jsonRenderer) Debug(w io.Writer, _ []string, rows []cli.DebugRow) error {
 	out := make([]row, len(rows))
 	for i, d := range rows {
 		out[i] = row{Option: d.Option, Value: d.Value, Source: d.Source.String()}

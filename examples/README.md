@@ -25,7 +25,8 @@ repository describes the features that the examples show. The module
 | [`12-errors`](12-errors) | a program that inspects the error of `App.Execute` in place of `App.Main`, with a hint for each sentinel that its runs meet |
 | [`13-charm`](13-charm) | the help, the failures and the table of `--flag-debug` through `charm.New` with a theme, a help at the width in `COLUMNS`, and `Run.Environ` for a style of a handler |
 | [`14-testing`](14-testing) | the tests of a program without commands: runs with an `Env`, input files of `clitest.Files`, an `Env` of `cli.Vars` and `cli.Environ`, the handler of the app through `NewRun`, and a context that has ended |
-| [`15-renderer`](15-renderer) | a renderer of its own that embeds `cli.Plain` and writes the help, the failures and the rows of `--flag-debug` as JSON |
+| [`15-renderer`](15-renderer) | a renderer for each run through `App.RenderFor`: the option `--format` selects `cli.Plain` or a renderer of its own that writes the help, the failures and the rows of `--flag-debug` as JSON |
+| [`16-workspace`](16-workspace) | a workspace file that `App.LocateConfig` finds from `--chdir` upward, with keys that `App.IgnoreKeys` leaves to the handler |
 
 Each example imports the module `go.stealthscale.io/cli`. The examples `09-yaml`, `10-toml` and
 `13-charm` also import the module of their name.

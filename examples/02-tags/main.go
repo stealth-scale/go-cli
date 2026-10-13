@@ -7,7 +7,8 @@
 //
 // The fields of Backup use the tags help, default, enum, required, name, short, env, key and secret.
 // The comment of each field describes the effect of its tags. The examples 04-arguments and
-// 05-groups show the tags arg and prefix.
+// 05-groups show the tags arg and prefix. The global option Config selects a config file, so the
+// help notes the config key of each option.
 package main
 
 import (
@@ -17,6 +18,12 @@ import (
 
 	"go.stealthscale.io/cli"
 )
+
+// Global contains the options of every command.
+type Global struct {
+	// The config file sets the options of run by their config keys.
+	Config cli.ConfigFile `help:"Config file in JSON." short:"c"`
+}
 
 // Backup contains the options of the command run.
 type Backup struct {
@@ -42,15 +49,15 @@ func main() {
 }
 
 // app returns the program backup with the command run.
-func app() *cli.App[struct{}] {
-	a := cli.New[struct{}]("backup", "Back up the store.")
+func app() *cli.App[Global] {
+	a := cli.New[Global]("backup", "Back up the store.")
 	a.Command("run", "Write an archive of the store to a bucket.", backup)
 	return a
 }
 
 // backup writes the plan of the backup. It writes whether a token is set and does not write the
 // token.
-func backup(_ context.Context, run *cli.Run[struct{}, Backup]) error {
+func backup(_ context.Context, run *cli.Run[Global, Backup]) error {
 	b := run.Config()
 	out := fmt.Appendf(nil, "archive %s with %s, keep %d, endpoint %s\n", b.Bucket, b.Compression, b.Keep, b.Endpoint)
 	if b.Token != "" {

@@ -27,7 +27,7 @@ Commands:
 Options:
       --flag-debug  Print the value and the source of each option before the command runs.  env GREET_FLAG_DEBUG
   -h, --help        Show the help.
-  -v, --verbose     Print the options of the greeting.                                      env GREET_VERBOSE, key verbose
+  -v, --verbose     Print the options of the greeting.                                      env GREET_VERBOSE
 [exit 0]
 
 $ greet hello -h
@@ -39,13 +39,13 @@ Arguments:
       NAME  Name to greet.  default "world"
 
 Options:
-  -g, --greeting string  Word of the greeting.  default "Hello", env GREET_HELLO_GREETING, key hello.greeting
-  -n, --times int        Number of greetings.   default "1", env GREET_HELLO_TIMES, key hello.times
+  -g, --greeting string  Word of the greeting.  default "Hello", env GREET_HELLO_GREETING
+  -n, --times int        Number of greetings.   default "1", env GREET_HELLO_TIMES
 
 Global options:
       --flag-debug  Print the value and the source of each option before the command runs.  env GREET_FLAG_DEBUG
   -h, --help        Show the help.
-  -v, --verbose     Print the options of the greeting.                                      env GREET_VERBOSE, key verbose
+  -v, --verbose     Print the options of the greeting.                                      env GREET_VERBOSE
 [exit 0]
 
 $ greet
@@ -59,7 +59,7 @@ Commands:
 Options:
       --flag-debug  Print the value and the source of each option before the command runs.  env GREET_FLAG_DEBUG
   -h, --help        Show the help.
-  -v, --verbose     Print the options of the greeting.                                      env GREET_VERBOSE, key verbose
+  -v, --verbose     Print the options of the greeting.                                      env GREET_VERBOSE
 
 greet: missing command
 [exit 2]

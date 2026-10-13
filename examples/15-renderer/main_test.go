@@ -11,18 +11,25 @@ import (
 	"go.stealthscale.io/cli/clitest"
 )
 
-// asJSON contains the variable that selects the output in JSON.
-var asJSON = map[string]string{"OUTPUT": "json"}
-
 // runs are the command lines of the transcript of the example.
 var runs = []clitest.Input{
 	{Args: []string{"count", "bolts"}},
+	{Args: []string{"--format", "json", "count", "bolts"}},
 	{Args: []string{"count", "--help"}},
-	{Vars: asJSON, Args: []string{"count", "--help"}},
+	{Args: []string{"--format", "json", "count", "--help"}},
 	{Args: []string{"count"}},
-	{Vars: asJSON, Args: []string{"count"}},
-	{Vars: asJSON, Args: []string{"cuont", "bolts"}},
-	{Vars: asJSON, Args: []string{"count", "bolts", "-w", "east", "--flag-debug"}},
+	{Args: []string{"--format", "json", "count"}},
+	{Args: []string{"--format", "json", "cuont", "bolts"}},
+	{
+		Comment: "The variable selects the format of a run whose command line fails.",
+		Vars:    map[string]string{"STOCK_FORMAT": "json"},
+		Args:    []string{"count", "bolts", "--bogus"},
+	},
+	{
+		Comment: "A flag after the first fault does not count.",
+		Args:    []string{"count", "bolts", "--bogus", "--format", "json"},
+	},
+	{Args: []string{"--format", "json", "count", "bolts", "-w", "east", "--flag-debug"}},
 }
 
 // TestRenderer checks the transcript of the runs of the example.

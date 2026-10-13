@@ -19,6 +19,10 @@ var runs = []clitest.Input{
 	{Args: []string{"run", "--bucket", "nightly", "--retain", "3", "-z", "gzip", "-n"}},
 	{Args: []string{"run", "--bucket", "nightly", "--schedule", "0 3 * * *"}},
 	{
+		Args:  []string{"-c", "backup.json", "run", "--bucket", "nightly"},
+		Files: clitest.Files{"backup.json": `{"storage": {"endpoint": "https://minio.internal"}}`},
+	},
+	{
 		Vars: map[string]string{"BACKUP_TOKEN": "s3cret", "BACKUP_RUN_RETAIN": "14"},
 		Args: []string{"run", "--bucket", "nightly", "--flag-debug"},
 	},

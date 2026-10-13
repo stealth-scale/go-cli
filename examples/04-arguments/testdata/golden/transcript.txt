@@ -22,7 +22,7 @@ Arguments:
       FILES    Files to add, or - for the standard input.
 
 Options:
-  -l, --level int  Level of the compression.  default "6", env PACK_ADD_LEVEL, key add.level
+  -l, --level int  Level of the compression.  default "6", env PACK_ADD_LEVEL
 
 Global options:
       --flag-debug  Print the value and the source of each option before the command runs.  env PACK_FLAG_DEBUG

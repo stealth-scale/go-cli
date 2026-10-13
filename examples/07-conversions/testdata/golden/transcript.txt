@@ -4,12 +4,12 @@ Usage: units check [options]
 Print the options and compare each size with the largest size.
 
 Options:
-      --max bytesize        Largest size of an upload.               default "1MB", env UNITS_CHECK_MAX, key check.max
-      --origin point        Origin of the grid.                      default "0,0", env UNITS_CHECK_ORIGIN, key check.origin
-      --sizes bytesize,...  Sizes to compare with the largest size.  env UNITS_CHECK_SIZES, key check.sizes
-      --target celsius      Target temperature.                      default "21C", env UNITS_CHECK_TARGET, key check.target
-      --version version     Lowest version of a client.              default "v1.0.0", env UNITS_CHECK_VERSION, key check.version
-      --webhook url         Webhook of the alerts.                   env UNITS_CHECK_WEBHOOK, key check.webhook
+      --max bytesize        Largest size of an upload.               default "1MB", env UNITS_CHECK_MAX
+      --origin point        Origin of the grid.                      default "0,0", env UNITS_CHECK_ORIGIN
+      --sizes bytesize,...  Sizes to compare with the largest size.  env UNITS_CHECK_SIZES
+      --target celsius      Target temperature.                      default "21C", env UNITS_CHECK_TARGET
+      --version version     Lowest version of a client.              default "v1.0.0", env UNITS_CHECK_VERSION
+      --webhook url         Webhook of the alerts.                   env UNITS_CHECK_WEBHOOK
 
 Global options:
       --flag-debug  Print the value and the source of each option before the command runs.  env UNITS_FLAG_DEBUG

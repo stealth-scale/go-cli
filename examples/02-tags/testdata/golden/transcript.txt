@@ -13,8 +13,9 @@ Options:
       --token string                Access token of the bucket.        env BACKUP_TOKEN, key run.token
 
 Global options:
-      --flag-debug  Print the value and the source of each option before the command runs.  env BACKUP_FLAG_DEBUG
-  -h, --help        Show the help.
+  -c, --config file  Config file in JSON.                                                    env BACKUP_CONFIG
+      --flag-debug   Print the value and the source of each option before the command runs.  env BACKUP_FLAG_DEBUG
+  -h, --help         Show the help.
 [exit 0]
 
 $ backup run
@@ -35,8 +36,15 @@ archive nightly with zstd, keep 7, endpoint https://s3.example.com
 schedule the next backup at "0 3 * * *"
 [exit 0]
 
+$ cat backup.json
+{"storage": {"endpoint": "https://minio.internal"}}
+$ backup -c backup.json run --bucket nightly
+archive nightly with zstd, keep 7, endpoint https://minio.internal
+[exit 0]
+
 $ BACKUP_RUN_RETAIN=14 BACKUP_TOKEN=s3cret backup run --bucket nightly --flag-debug
   OPTION         VALUE                     SOURCE
+  --config       ""                        default
   --bucket       "nightly"                 flag --bucket
   --compression  "zstd"                    default
   --dry-run      false                     default

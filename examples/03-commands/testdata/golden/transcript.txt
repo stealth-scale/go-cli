@@ -12,7 +12,7 @@ Commands:
 Options:
       --flag-debug  Print the value and the source of each option before the command runs.  env DEPLOY_FLAG_DEBUG
   -h, --help        Show the help.
-  -v, --verbose     Print each step.                                                        env DEPLOY_VERBOSE, key verbose
+  -v, --verbose     Print each step.                                                        env DEPLOY_VERBOSE
 [exit 0]
 
 $ deploy plan --env prod
@@ -60,13 +60,13 @@ Arguments:
       RELEASE  Release to roll back to.
 
 Options:
-  -e, --env dev|prod   Environment to act on.      required, env DEPLOY_ROLLBACK_ENV, key rollback.env
-      --region string  Region of the environment.  default "eu-west-1", env DEPLOY_ROLLBACK_REGION, key rollback.region
+  -e, --env dev|prod   Environment to act on.      required, env DEPLOY_ROLLBACK_ENV
+      --region string  Region of the environment.  default "eu-west-1", env DEPLOY_ROLLBACK_REGION
 
 Global options:
       --flag-debug  Print the value and the source of each option before the command runs.  env DEPLOY_FLAG_DEBUG
   -h, --help        Show the help.
-  -v, --verbose     Print each step.                                                        env DEPLOY_VERBOSE, key verbose
+  -v, --verbose     Print each step.                                                        env DEPLOY_VERBOSE
 [exit 0]
 
 $ deploy plan -e dev >/dev/full
@@ -115,7 +115,7 @@ Arguments:
 Global options:
       --flag-debug   Print the value and the source of each option before the command runs.  env DEPLOY_FLAG_DEBUG
   -h, --help         Show the help.
-      --url string   URL of the registry.                                                    default "registry.example.com", env DEPLOY_REGISTRY_URL, key registry.url
-      --user string  User of the registry.                                                   default "deploy", env DEPLOY_REGISTRY_USER, key registry.user
-  -v, --verbose      Print each step.                                                        env DEPLOY_VERBOSE, key verbose
+      --url string   URL of the registry.                                                    default "registry.example.com", env DEPLOY_REGISTRY_URL
+      --user string  User of the registry.                                                   default "deploy", env DEPLOY_REGISTRY_USER
+  -v, --verbose      Print each step.                                                        env DEPLOY_VERBOSE
 [exit 0]

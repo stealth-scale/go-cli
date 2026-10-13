@@ -4,25 +4,25 @@ Usage: types show [options]
 Print the value of each option.
 
 Options:
-      --addr addr              A netip.Addr.                             env TYPES_SHOW_ADDR, key show.addr
-      --enabled                A bool.                                   env TYPES_SHOW_ENABLED, key show.enabled
-      --level int8             An int8.                                  env TYPES_SHOW_LEVEL, key show.level
-      --limits string=int,...  A map of entries of the form key=value.   env TYPES_SHOW_LIMITS, key show.limits
-      --log level              A slog.Level, such as debug or warn.      env TYPES_SHOW_LOG, key show.log
-      --mirror url             A url.URL.                                env TYPES_SHOW_MIRROR, key show.mirror
-      --mode filemode          An fs.FileMode in octal, such as 0640.    env TYPES_SHOW_MODE, key show.mode
-      --name string            A string.                                 env TYPES_SHOW_NAME, key show.name
-      --network ipnet          A net.IPNet in CIDR notation.             env TYPES_SHOW_NETWORK, key show.network
-      --peer ipnet             A *net.IPNet in CIDR notation.            env TYPES_SHOW_PEER, key show.peer
-      --port uint16            A uint16.                                 env TYPES_SHOW_PORT, key show.port
-      --ports uint16,...       A slice of uint16.                        env TYPES_SHOW_PORTS, key show.ports
-      --ratio float64          A float64.                                env TYPES_SHOW_RATIO, key show.ratio
-      --since time             A time.Time in RFC 3339.                  env TYPES_SHOW_SINCE, key show.since
-      --tags string,...        A slice of strings that commas separate.  env TYPES_SHOW_TAGS, key show.tags
-      --timeout duration       A time.Duration, such as 1m30s.           env TYPES_SHOW_TIMEOUT, key show.timeout
-      --upstream url           A *url.URL.                               env TYPES_SHOW_UPSTREAM, key show.upstream
-      --workers int            A *int, nil until a source sets it.       env TYPES_SHOW_WORKERS, key show.workers
-      --zone location          A *time.Location of the zone database.    env TYPES_SHOW_ZONE, key show.zone
+      --addr addr              A netip.Addr.                             env TYPES_SHOW_ADDR
+      --enabled                A bool.                                   env TYPES_SHOW_ENABLED
+      --level int8             An int8.                                  env TYPES_SHOW_LEVEL
+      --limits string=int,...  A map of entries of the form key=value.   env TYPES_SHOW_LIMITS
+      --log level              A slog.Level, such as debug or warn.      env TYPES_SHOW_LOG
+      --mirror url             A url.URL.                                env TYPES_SHOW_MIRROR
+      --mode filemode          An fs.FileMode in octal, such as 0640.    env TYPES_SHOW_MODE
+      --name string            A string.                                 env TYPES_SHOW_NAME
+      --network ipnet          A net.IPNet in CIDR notation.             env TYPES_SHOW_NETWORK
+      --peer ipnet             A *net.IPNet in CIDR notation.            env TYPES_SHOW_PEER
+      --port uint16            A uint16.                                 env TYPES_SHOW_PORT
+      --ports uint16,...       A slice of uint16.                        env TYPES_SHOW_PORTS
+      --ratio float64          A float64.                                env TYPES_SHOW_RATIO
+      --since time             A time.Time in RFC 3339.                  env TYPES_SHOW_SINCE
+      --tags string,...        A slice of strings that commas separate.  env TYPES_SHOW_TAGS
+      --timeout duration       A time.Duration, such as 1m30s.           env TYPES_SHOW_TIMEOUT
+      --upstream url           A *url.URL.                               env TYPES_SHOW_UPSTREAM
+      --workers int            A *int, nil until a source sets it.       env TYPES_SHOW_WORKERS
+      --zone location          A *time.Location of the zone database.    env TYPES_SHOW_ZONE
 
 Global options:
       --flag-debug  Print the value and the source of each option before the command runs.  env TYPES_FLAG_DEBUG
