@@ -98,7 +98,7 @@ $ stock --format json count --help
 
 $ stock count
 stock: count: missing argument ITEM
-[exit 2]
+[exit 64]
 
 $ stock --format json count
 {
@@ -107,7 +107,7 @@ $ stock --format json count
   "message": "missing argument ITEM",
   "usage": true
 }
-[exit 2]
+[exit 64]
 
 $ stock --format json cuont bolts
 {
@@ -116,7 +116,7 @@ $ stock --format json cuont bolts
   "suggestion": "count",
   "usage": true
 }
-[exit 2]
+[exit 64]
 
 # The variable selects the format of a run whose command line fails.
 $ STOCK_FORMAT=json stock count bolts --bogus
@@ -126,12 +126,12 @@ $ STOCK_FORMAT=json stock count bolts --bogus
   "message": "unknown flag --bogus",
   "usage": true
 }
-[exit 2]
+[exit 64]
 
 # A flag after the first fault does not count.
 $ stock count bolts --bogus --format json
 stock: count: unknown flag --bogus
-[exit 2]
+[exit 64]
 
 $ stock --format json count bolts -w east --flag-debug
 [

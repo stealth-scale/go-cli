@@ -18,6 +18,11 @@
 // of the command line, so a --format json after an unknown flag does not select JSON. The variable
 // STOCK_FORMAT selects the format of every run. The handler of count writes its result in the
 // format of the run too.
+//
+// The function run calls App.ExecuteRenderer in place of App.Main, and writes the failure that
+// App.Failure returns with the renderer of the run. It writes a failure in JSON to the standard
+// output, so a script reads one stream. It exits with 64 for a usage error, the value of EX_USAGE
+// in sysexits.h, and with 1 for any other error.
 package main
 
 import (
@@ -35,6 +40,14 @@ const jsonFormat = "json"
 
 // items is the number of every item in every warehouse.
 const items = 12
+
+// The exit statuses of the program.
+const (
+	// exitFailure is the status of a run whose handler fails.
+	exitFailure = 1
+	// exitUsage is the status of a usage error, EX_USAGE of sysexits.h.
+	exitUsage = 64
+)
 
 // Global contains the options of every command.
 type Global struct {
@@ -74,7 +87,33 @@ type result struct {
 }
 
 func main() {
-	os.Exit(app().Main(context.Background(), cli.OS()))
+	os.Exit(run(context.Background(), cli.OS()))
+}
+
+// run runs the command line of env and returns the exit status: 0, exitUsage for a usage error and
+// exitFailure for any other error. It writes the failure of a run with the renderer of the run, to
+// the standard output for jsonRenderer and to the standard error for cli.Plain.
+func run(ctx context.Context, env *cli.Env) int {
+	a := app()
+	r, err := a.ExecuteRenderer(ctx, env)
+	f := a.Failure(err)
+	if f == nil {
+		return 0
+	}
+	w := env.Stderr
+	if _, ok := r.(jsonRenderer); ok {
+		w = env.Stdout
+	}
+	var environ []string
+	if env.Environ != nil {
+		environ = env.Environ()
+	}
+	// The exit status reports the error also when the failure fails to write.
+	_ = r.Error(w, environ, f)
+	if f.Usage {
+		return exitUsage
+	}
+	return exitFailure
 }
 
 // app returns the program stock with the command count. The option --format selects its renderer.
