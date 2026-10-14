@@ -1,5 +1,14 @@
 # go.stealthscale.io/cli
 
+## 0.5.0
+
+### Minor Changes
+
+- e3391b0: Add the command `completion` and `App.Complete` to complete a program in bash, zsh, fish and PowerShell.
+- 19961fb: Add `App.Version` and the global flag `--version` to write a version that the program builds.
+- e3391b0: **Breaking:** Reserve the command name `completion` and list the command in the help of every app with commands.
+- 19961fb: **Breaking:** Add the method `Version` to `cli.Renderer`. A renderer that embeds `cli.Plain` inherits it.
+
 ## 0.4.0
 
 ### Minor Changes

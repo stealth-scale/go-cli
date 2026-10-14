@@ -1,5 +1,19 @@
 # go.stealthscale.io/cli/charm
 
+## 0.2.0
+
+### Minor Changes
+
+- ca1954a: Add `Renderer.Version` to write the version of an app as `cli.Plain` does.
+
+### Patch Changes
+
+- Updated dependencies [e3391b0]
+- Updated dependencies [19961fb]
+- Updated dependencies [e3391b0]
+- Updated dependencies [19961fb]
+  - go.stealthscale.io/cli@0.5.0
+
 ## 0.1.3
 
 ### Patch Changes

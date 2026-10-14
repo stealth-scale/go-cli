@@ -1,5 +1,15 @@
 # go.stealthscale.io/cli/yaml
 
+## 0.1.4
+
+### Patch Changes
+
+- Updated dependencies [e3391b0]
+- Updated dependencies [19961fb]
+- Updated dependencies [e3391b0]
+- Updated dependencies [19961fb]
+  - go.stealthscale.io/cli@0.5.0
+
 ## 0.1.3
 
 ### Patch Changes
