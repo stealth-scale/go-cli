@@ -210,6 +210,7 @@ The command line follows the rules of GNU:
 - After a command with subcommands, an argument that is not a flag is the name of a subcommand.
 - The argument `--` ends the flags.
 - The flags `-h` and `--help` write the help of the app or of the last command of the path.
+- The flag `--version` writes the version of an app that registers one.
 
 A run fails for an unknown command, flag or config key. The package suggests a similar command, long
 flag or key when the app declares one:
@@ -474,6 +475,42 @@ listen on :9000 with a timeout of 5s for ["https://admin.example.com"]
 src, _ := run.Source(&run.Config().Timeout) // env SRV_SERVE_TIMEOUT
 ```
 
+## Version
+
+`App.Version` registers the version of an app and declares the global flag `--version`. The program
+builds the whole text of the version, such as from variables that the linker sets in a release
+build:
+
+```go
+var version, commit, date = "dev", "none", "unknown"
+
+func app() *cli.App[Global] {
+	a := cli.New[Global]("srv", "Serve the store.")
+	a.Version(fmt.Sprintf("srv %s (%s, %s)", version, commit, date))
+	a.Command("serve", "Run the server.", serve)
+	return a
+}
+```
+
+```console
+$ go build -ldflags "-X main.version=1.4.2 -X main.commit=f70f638 -X main.date=2026-10-13"
+$ srv --version
+srv 1.4.2 (f70f638, 2026-10-13)
+```
+
+The flag `--version` follows these rules:
+
+- The flag can come anywhere on the command line, like `--help`.
+- A run with the flag writes the version to the standard output and exits with 0.
+- The run does not check the other options and the positional arguments, so `srv serve --version`
+  writes the version also when `serve` lacks a required argument.
+- The flags of the help take precedence over the flag of the version.
+- An app that does not call `App.Version` does not declare the flag, so an option of the app can
+  declare `--version`.
+
+`debug.ReadBuildInfo` returns the version of the main module as another source of the text. Since
+Go 1.24 `go build` sets that version from the tag or the commit of the checkout.
+
 ## Errors and exit statuses
 
 `App.Main` writes the message of an error to the standard error after the name of the app and
@@ -481,7 +518,7 @@ returns the exit status for `os.Exit`:
 
 | Status | Constant | Cause |
 |---|---|---|
-| 0 | `cli.ExitOK` | The handler succeeds or the run writes the help |
+| 0 | `cli.ExitOK` | The handler succeeds, or the run writes the help or the version |
 | 1 | `cli.ExitFailure` | The handler fails or the declarations of the app are invalid |
 | 2 | `cli.ExitUsage` | The command line, an environment variable or the config file is invalid |
 
@@ -498,7 +535,7 @@ of the app finds it.
 
 ## Output
 
-The renderer of an app writes the help, the message of a failed run and the table of
+The renderer of an app writes the help, the version, the message of a failed run and the table of
 `--flag-debug`. `cli.New` sets the renderer `cli.Plain`, which writes the plain text of the other
 sections of this README. `App.Render` registers another `cli.Renderer`. The module
 `go.stealthscale.io/cli/charm` renders the output with Lip Gloss:
@@ -548,7 +585,8 @@ $ srv serve --adr :9000
 ```
 
 A pipe or a file receives the help without styles, and the failure and the table of `cli.Plain`.
-`NO_COLOR` removes the colors in a terminal, and `CLICOLOR_FORCE` writes the styles to any writer.
+Every writer receives the version of `cli.Plain`, so the program controls the whole text. `NO_COLOR`
+removes the colors in a terminal, and `CLICOLOR_FORCE` writes the styles to any writer.
 A program changes the styles of `charm.DefaultTheme` and passes the theme to `charm.New`:
 
 ```go
@@ -557,10 +595,10 @@ t.Flag = t.Flag.Foreground(lipgloss.Green)
 a.Render(charm.New(&t))
 ```
 
-A renderer of your own implements the three methods of `cli.Renderer`. It can embed `cli.Plain` to
+A renderer of your own implements the four methods of `cli.Renderer`. It can embed `cli.Plain` to
 replace only some of them. `App.RenderFor` registers a function that selects the renderer of each
 run from its global options, so an option such as `--format json` selects the output of the help,
-the failures and `--flag-debug`:
+the version, the failures and `--flag-debug`:
 
 ```go
 a.RenderFor(func(g *Global) cli.Renderer {
