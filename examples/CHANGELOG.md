@@ -1,5 +1,21 @@
 # go.stealthscale.io/cli/examples
 
+## 0.0.5
+
+### Patch Changes
+
+- 548d92d: Add the example `17-completion`.
+- bc6d290: Show the flag `--version` in the example `15-renderer`.
+- Updated dependencies [e3391b0]
+- Updated dependencies [19961fb]
+- Updated dependencies [ca1954a]
+- Updated dependencies [e3391b0]
+- Updated dependencies [19961fb]
+  - go.stealthscale.io/cli@0.5.0
+  - go.stealthscale.io/cli/charm@0.2.0
+  - go.stealthscale.io/cli/toml@0.1.4
+  - go.stealthscale.io/cli/yaml@0.1.4
+
 ## 0.0.4
 
 ### Patch Changes
