@@ -10,8 +10,13 @@
 // text. jsonRenderer writes JSON:
 //   - Help writes the cli.Help of the app or of a command, with its cli.HelpCommand and
 //     cli.HelpOption values.
+//   - Version writes the version, the commit and the date of the build.
 //   - Error writes the cli.Failure of a run without its error.
 //   - Debug writes the cli.DebugRow values of --flag-debug with each source as text.
+//
+// The linker sets the variables version, commit and date in a release build. App.Version registers
+// the text that the program builds from them, and cli.Plain writes that text for the flag
+// --version. jsonRenderer writes the variables themselves.
 //
 // A run applies the valid values of its sources before the function selects the renderer, so the
 // usage error of a command line with --format json is JSON. The flags count up to the first fault
@@ -49,6 +54,15 @@ const (
 	exitUsage = 64
 )
 
+// version, commit and date describe the build of the program. A release build sets them with the
+// flags of the linker, such as
+// go build -ldflags "-X main.version=1.4.2 -X main.commit=f70f638 -X main.date=2026-10-13".
+var (
+	version = "dev"     // the version of the release
+	commit  = "none"    // the commit of the release
+	date    = "unknown" // the date of the release
+)
+
 // Global contains the options of every command.
 type Global struct {
 	Format string `help:"Output format." default:"text" enum:"text,json"`
@@ -70,6 +84,14 @@ type failure struct {
 	Message    string `json:"message"`
 	Suggestion string `json:"suggestion,omitempty"`
 	Usage      bool   `json:"usage"`
+}
+
+// build is the JSON form of the version of the program.
+type build struct {
+	App     string `json:"app"`
+	Version string `json:"version"`
+	Commit  string `json:"commit"`
+	Date    string `json:"date"`
 }
 
 // row is the JSON form of a cli.DebugRow, with its source as text.
@@ -116,9 +138,11 @@ func run(ctx context.Context, env *cli.Env) int {
 	return exitFailure
 }
 
-// app returns the program stock with the command count. The option --format selects its renderer.
+// app returns the program stock with its version and the command count. The option --format
+// selects its renderer.
 func app() *cli.App[Global] {
 	a := cli.New[Global]("stock", "Count the items of the warehouses.")
+	a.Version(fmt.Sprintf("stock %s (%s, %s)", version, commit, date))
 	a.RenderFor(func(g *Global) cli.Renderer {
 		if g.Format == jsonFormat {
 			return jsonRenderer{}
@@ -154,6 +178,12 @@ func encode(w io.Writer, v any) error {
 // Help writes h as JSON.
 func (jsonRenderer) Help(w io.Writer, _ []string, h *cli.Help) error {
 	return encode(w, h)
+}
+
+// Version writes the version, the commit and the date of the build as JSON. It writes the variables
+// of the build in place of the text of v.
+func (jsonRenderer) Version(w io.Writer, _ []string, v *cli.Version) error {
+	return encode(w, &build{App: v.App, Version: version, Commit: commit, Date: date})
 }
 
 // Error writes the failure f as JSON.

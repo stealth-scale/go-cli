@@ -25,6 +25,7 @@ Global options:
       --flag-debug        Print the value and the source of each option before the command runs.  env STOCK_FLAG_DEBUG
       --format text|json  Output format.                                                          default "text", env STOCK_FORMAT
   -h, --help              Show the help.
+      --version           Show the version.
 [exit 0]
 
 $ stock --format json count --help
@@ -91,9 +92,37 @@ $ stock --format json count --help
       "Env": "",
       "Key": "",
       "Required": false
+    },
+    {
+      "Name": "--version",
+      "Short": "",
+      "Placeholder": "",
+      "Text": "Show the version.",
+      "Default": "",
+      "Env": "",
+      "Key": "",
+      "Required": false
     }
   ]
 }
+[exit 0]
+
+$ stock --version
+stock dev (none, unknown)
+[exit 0]
+
+$ stock --format json --version
+{
+  "app": "stock",
+  "version": "dev",
+  "commit": "none",
+  "date": "unknown"
+}
+[exit 0]
+
+# The flag --version does not check the arguments of the command.
+$ stock count --version
+stock dev (none, unknown)
 [exit 0]
 
 $ stock count

@@ -18,6 +18,12 @@ var runs = []clitest.Input{
 	{Args: []string{"--format", "json", "count", "bolts"}},
 	{Args: []string{"count", "--help"}},
 	{Args: []string{"--format", "json", "count", "--help"}},
+	{Args: []string{"--version"}},
+	{Args: []string{"--format", "json", "--version"}},
+	{
+		Comment: "The flag --version does not check the arguments of the command.",
+		Args:    []string{"count", "--version"},
+	},
 	{Args: []string{"count"}},
 	{Args: []string{"--format", "json", "count"}},
 	{Args: []string{"--format", "json", "cuont", "bolts"}},
