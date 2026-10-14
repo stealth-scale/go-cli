@@ -1,4 +1,7 @@
 #compdef {{app}}
+# Copyright Stealth Scale B.V. 2026
+# SPDX-License-Identifier: MIT
+
 # zsh completion of {{app}}.
 # Load it with: source <({{app}} completion zsh)
 # or write it to a file _{{app}} in a directory of $fpath.

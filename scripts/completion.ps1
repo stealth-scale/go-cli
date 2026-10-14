@@ -1,3 +1,6 @@
+# Copyright Stealth Scale B.V. 2026
+# SPDX-License-Identifier: MIT
+
 # PowerShell completion of {{app}}.
 # Load it with: {{app}} completion powershell | Out-String | Invoke-Expression
 

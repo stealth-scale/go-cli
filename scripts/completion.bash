@@ -1,3 +1,6 @@
+# Copyright Stealth Scale B.V. 2026
+# SPDX-License-Identifier: MIT
+
 # bash completion of {{app}}, for bash 4.1 or later.
 # Load it with: source <({{app}} completion bash)
 
