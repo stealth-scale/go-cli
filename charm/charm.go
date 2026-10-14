@@ -33,7 +33,8 @@ const (
 // colorprofile decides from the writer and from the environment of the run whether the output
 // contains styles. A terminal receives the styles. A pipe or a file receives the same help without
 // styles, and the failures and the table of --flag-debug of cli.Plain. NO_COLOR removes the colors
-// and keeps bold and faint text. CLICOLOR_FORCE writes the styles to any writer.
+// and keeps bold and faint text. CLICOLOR_FORCE writes the styles to any writer. Every writer
+// receives the version of cli.Plain.
 //
 // The output wraps at the width in the environment variable COLUMNS, at most 100 columns. Without
 // COLUMNS it wraps at 80 columns. A Renderer does not change after [New], so concurrent runs can
@@ -101,6 +102,15 @@ func (r *Renderer) Help(w io.Writer, environ []string, h *cli.Help) error {
 		return fmt.Errorf("charm: write the help: %w", err)
 	}
 	return nil
+}
+
+// Version writes the text of v to w through cli.Plain. A terminal also receives the text without
+// styles, so the program controls the whole output.
+//
+// Error modes:
+//   - the error of cli.Plain.
+func (*Renderer) Version(w io.Writer, environ []string, v *cli.Version) error {
+	return cli.Plain{}.Version(w, environ, v)
 }
 
 // Error writes the failure f to w. A terminal receives a badge with the message and the suggestion.

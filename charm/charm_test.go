@@ -92,6 +92,9 @@ var usageFailure = &cli.Failure{
 	App: "srv", Command: "serve", Message: "unknown flag --adr", Suggestion: "--addr", Usage: true,
 }
 
+// version is the version of the app srv in the tests.
+var version = &cli.Version{App: "srv", Text: "srv 1.4.2 (f70f638, 2026-10-13)"}
+
 // debugRows are the rows of the table of --flag-debug in the tests.
 var debugRows = []cli.DebugRow{
 	{Option: "--config", Value: `"srv.json"`},
@@ -455,6 +458,25 @@ func TestCharm(t *testing.T) {
 			assert.ErrorIs(t, err, errWrite, "Debug returns the error of the writer")
 			assert.Equal(t, err.Error(), "cli: write the output of --flag-debug: disk full",
 				"Debug returns the error of cli.Plain")
+		})
+	})
+
+	t.Run("Version", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("writes the text of cli.Plain to a terminal", func(t *testing.T) {
+			t.Parallel()
+			var got, want bytes.Buffer
+			assert.NoError(t, renderer().Version(&got, forced, version), "Version writes the version")
+			assert.NoError(t, cli.Plain{}.Version(&want, nil, version), "Plain writes the version")
+			assert.Equal(t, got.String(), want.String(), "Version writes the text of cli.Plain")
+		})
+
+		t.Run("returns the error of cli.Plain", func(t *testing.T) {
+			t.Parallel()
+			err := renderer().Version(failingWriter{}, forced, version)
+			assert.ErrorIs(t, err, errWrite, "Version returns the error of the writer")
+			assert.Equal(t, err.Error(), "cli: write the version: disk full", "Version returns the error of cli.Plain")
 		})
 	})
 }

@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 // Package charm renders the output of a go.stealthscale.io/cli app with Lip Gloss. It renders the
-// help, the failures and the table of --flag-debug.
+// help, the failures and the table of --flag-debug. It writes the version of an app through
+// cli.Plain.
 //
 // The package cli imports only the standard library, so the renderer is in a module of its own. A
 // program registers the renderer before the app runs:
