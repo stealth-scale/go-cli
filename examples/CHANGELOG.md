@@ -1,5 +1,17 @@
 # go.stealthscale.io/cli/examples
 
+## 0.0.6
+
+### Patch Changes
+
+- c6372b3: Show a help text with a description and an option text of two lines in the example `03-commands`.
+- Updated dependencies [0f570b6]
+- Updated dependencies [0f570b6]
+  - go.stealthscale.io/cli@0.5.1
+  - go.stealthscale.io/cli/charm@0.2.1
+  - go.stealthscale.io/cli/toml@0.1.5
+  - go.stealthscale.io/cli/yaml@0.1.5
+
 ## 0.0.5
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # go.stealthscale.io/cli
 
+## 0.5.1
+
+### Patch Changes
+
+- 0f570b6: List each subcommand in the help with the first paragraph of its help text on one line.
+- 0f570b6: Write each further line of a help text in the column of the text in `cli.Plain`.
+
 ## 0.5.0
 
 ### Minor Changes
