@@ -4,10 +4,11 @@ Usage: deploy <command> [options]
 Deploy the service.
 
 Commands:
-  plan      Print the changes of a deployment.
-  apply     Apply the changes of a deployment.
-  rollback  Roll back to an earlier release.
-  registry  Count the images of the registry.
+  plan        Print the changes of a deployment.
+  apply       Apply the changes of a deployment.
+  rollback    Roll back to an earlier release.
+  registry    Count the images of the registry.
+  completion  Write the completion script of a shell.
 
 Options:
       --flag-debug  Print the value and the source of each option before the command runs.  env DEPLOY_FLAG_DEBUG

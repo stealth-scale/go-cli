@@ -27,6 +27,7 @@ repository describes the features that the examples show. The module
 | [`14-testing`](14-testing) | the tests of a program without commands: runs with an `Env`, input files of `clitest.Files`, an `Env` of `cli.Vars` and `cli.Environ`, the handler of the app through `NewRun`, and a context that has ended |
 | [`15-renderer`](15-renderer) | a renderer for each run through `App.RenderFor`: the option `--format` selects `cli.Plain` or a renderer of its own that writes the help, the version, the failures and the rows of `--flag-debug` as JSON, a version of `App.Version` from variables of the linker, and exit statuses of its own through `App.ExecuteRenderer` and `App.Failure` |
 | [`16-workspace`](16-workspace) | a workspace file that `App.LocateConfig` finds from `--chdir` upward, with keys that `App.IgnoreKeys` leaves to the handler |
+| [`17-completion`](17-completion) | the command `completion` and the candidates of a command line, a function of `App.Complete` that reads the plans of the config file, and a test that runs the script of bash, zsh, fish and PowerShell in its shell |
 
 Each example imports the module `go.stealthscale.io/cli`. The examples `09-yaml`, `10-toml` and
 `13-charm` also import the module of their name.

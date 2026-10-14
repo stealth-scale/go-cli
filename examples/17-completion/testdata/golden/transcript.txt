@@ -1,0 +1,65 @@
+$ cat rollout.json
+{"plans": {"api": {"description": "The API."}, "web": {"description": "The website."}}}
+$ rollout apply web --region us-east
+apply web in us-east
+[exit 0]
+
+$ cat rollout.json
+{"plans": {"api": {"description": "The API."}, "web": {"description": "The website."}}}
+$ rollout apply nope
+rollout: main: unknown plan: nope
+[exit 1]
+
+# The commands for the first word.
+$ rollout completion zsh -- ''
+apply	Apply a plan.
+logs	Write the log files of the plans.
+completion	Write the completion script of a shell.
+:values
+[exit 0]
+
+# The plans of rollout.json, from the function of App.Complete.
+$ cat rollout.json
+{"plans": {"api": {"description": "The API."}, "web": {"description": "The website."}}}
+$ rollout completion zsh -- apply ''
+api	The API.
+web	The website.
+:values
+[exit 0]
+
+# The plans of the config file of the words.
+$ cat other.json
+{"plans": {"db": {"description": "The database."}}}
+$ rollout completion zsh -- -c other.json apply ''
+db	The database.
+:values
+[exit 0]
+
+$ rollout completion zsh -- apply web --region ''
+eu-west
+us-east
+:values
+[exit 0]
+
+# A value after the equals sign of its flag.
+$ rollout completion zsh -- apply web --region=u
+--region=us-east
+:values
+[exit 0]
+
+# bash receives the commands without their help texts.
+$ rollout completion bash -- ''
+apply
+logs
+completion
+:values
+[exit 0]
+
+# The shell offers the files of the formats for a config file.
+$ rollout completion zsh -- -c ''
+:files ini json
+[exit 0]
+
+$ rollout completion zsh -- logs ''
+:files
+[exit 0]

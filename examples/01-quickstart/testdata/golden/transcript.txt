@@ -22,7 +22,8 @@ Usage: greet <command> [options]
 Greet someone.
 
 Commands:
-  hello  Print a greeting.
+  hello       Print a greeting.
+  completion  Write the completion script of a shell.
 
 Options:
       --flag-debug  Print the value and the source of each option before the command runs.  env GREET_FLAG_DEBUG
@@ -54,7 +55,8 @@ Usage: greet <command> [options]
 Greet someone.
 
 Commands:
-  hello  Print a greeting.
+  hello       Print a greeting.
+  completion  Write the completion script of a shell.
 
 Options:
       --flag-debug  Print the value and the source of each option before the command runs.  env GREET_FLAG_DEBUG

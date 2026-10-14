@@ -7,6 +7,7 @@ USAGE
 COMMANDS
   serve              Run the server of the store.
   migrate            Migrate the store to the current schema.
+  completion         Write the completion script of a shell.
 
 OPTIONS
   -c, --config file  Config file in JSON.
