@@ -18,6 +18,7 @@ var runs = []clitest.Input{
 	{Args: []string{"-v", "apply", "-e", "prod", "-y"}},
 	{Args: []string{"apply", "-e", "prod", "-y", "--verbose"}},
 	{Args: []string{"apply", "-e", "prod"}},
+	{Args: []string{"apply", "--help"}},
 	{Args: []string{"rollback", "-e", "dev", "--region", "us-east-1", "41"}},
 	{Args: []string{"plan"}},
 	{Args: []string{"plan", "--env", "staging"}},

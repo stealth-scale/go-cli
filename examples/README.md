@@ -13,7 +13,7 @@ repository describes the features that the examples show. The module
 |---|---|
 | [`01-quickstart`](01-quickstart) | the smallest program: a global option, a command with an optional argument and two flags, the help, and the exit status of an error |
 | [`02-tags`](02-tags) | every tag of an option: `help`, `default`, `enum`, `required`, `name`, `short`, `env`, `key` and `secret` |
-| [`03-commands`](03-commands) | three commands that share embedded options, global flags before and after the command, a required enum, the error of a handler, the suggestion for a command, a command with a handler, a hook and two subcommands, and a hook of the app that writes `Run.Command` |
+| [`03-commands`](03-commands) | three commands that share embedded options, global flags before and after the command, a required enum, the error of a handler, the suggestion for a command, a command with a handler, a hook and two subcommands, a hook of the app that writes `Run.Command`, a help text with a description after a blank line, and an option text of two lines |
 | [`04-arguments`](04-arguments) | positional arguments: a required argument, an optional one and a list, the argument `--`, a lone `-`, and input files that `Run.Open` opens, with `-` for the standard input |
 | [`05-groups`](05-groups) | groups of options: nested structs, embedded structs, and the tag `prefix` |
 | [`06-types`](06-types) | an option of each type that the package converts without a registration, and the error of each conversion |

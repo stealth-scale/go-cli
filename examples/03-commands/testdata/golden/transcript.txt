@@ -6,7 +6,7 @@ Deploy the service.
 Commands:
   plan        Print the changes of a deployment.
   apply       Apply the changes of a deployment.
-  rollback    Roll back to an earlier release.
+  rollback    Roll back the target to an earlier release of the registry.
   registry    Count the images of the registry.
   completion  Write the completion script of a shell.
 
@@ -36,6 +36,23 @@ $ deploy apply -e prod
 deploy: main: apply changes prod only with --yes
 [exit 1]
 
+$ deploy apply --help
+Usage: deploy apply [options]
+
+Apply the changes of a deployment.
+
+Options:
+  -e, --env dev|prod   Environment to act on.      required, env DEPLOY_APPLY_ENV
+      --region string  Region of the environment.  default "eu-west-1", env DEPLOY_APPLY_REGION
+  -y, --yes            Apply the changes to prod.  env DEPLOY_APPLY_YES
+                       Without it, apply fails for prod.
+
+Global options:
+      --flag-debug  Print the value and the source of each option before the command runs.  env DEPLOY_FLAG_DEBUG
+  -h, --help        Show the help.
+  -v, --verbose     Print each step.                                                        env DEPLOY_VERBOSE
+[exit 0]
+
 $ deploy rollback -e dev --region us-east-1 41
 rollback: release 41 restored
 [exit 0]
@@ -55,7 +72,11 @@ deploy: unknown command "aply" (did you mean apply?)
 $ deploy rollback --help
 Usage: deploy rollback [options] RELEASE
 
-Roll back to an earlier release.
+Roll back the target to an earlier release
+of the registry.
+
+rollback deploys the release RELEASE to the target again. The command does not remove the later
+releases from the registry.
 
 Arguments:
       RELEASE  Release to roll back to.

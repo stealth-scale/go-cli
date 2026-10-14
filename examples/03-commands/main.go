@@ -18,6 +18,11 @@
 //
 // The hook trace of the app runs before every handler. With the flag --verbose it writes the path
 // of the command of the run to the standard error.
+//
+// The help text of rollback has a first paragraph of two lines and a description after a blank
+// line. The help of the app lists rollback with the first paragraph on one line, and rollback --help
+// writes the whole text. The help text of --yes has two lines, and apply --help writes the second
+// line at the column of the text.
 package main
 
 import (
@@ -52,7 +57,7 @@ type Plan struct {
 // Apply contains the options of the command apply.
 type Apply struct {
 	Target
-	Yes bool `help:"Apply the changes to prod." short:"y"`
+	Yes bool `help:"Apply the changes to prod.\nWithout it, apply fails for prod." short:"y"`
 }
 
 // Rollback contains the options of the command rollback.
@@ -92,7 +97,11 @@ func app() *cli.App[Global] {
 	a.Use(trace)
 	a.Command("plan", "Print the changes of a deployment.", plan)
 	a.Command("apply", "Apply the changes of a deployment.", apply)
-	a.Command("rollback", "Roll back to an earlier release.", rollback)
+	a.Command("rollback", `Roll back the target to an earlier release
+of the registry.
+
+rollback deploys the release RELEASE to the target again. The command does not remove the later
+releases from the registry.`, rollback)
 	registry := a.Command("registry", "Count the images of the registry.", images)
 	registry.Use(signIn)
 	registry.Command("push", "Push an image to the registry.", push)
