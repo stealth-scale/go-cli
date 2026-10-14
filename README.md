@@ -154,6 +154,24 @@ a.Command("plan", "Print the changes of a deployment.", plan)
 a.Command("apply", "Apply the changes of a deployment.", apply)
 ```
 
+The help text of a command can continue with a description after a blank line. The help of the
+app lists the command with the first paragraph of its help text on one line, and the help of the
+command shows the whole text:
+
+```go
+a.Command("rollback", `Roll back the target to an earlier release
+of the registry.
+
+rollback deploys the release RELEASE to the target again. The command does not remove the later
+releases from the registry.`, rollback)
+```
+
+The help of the app lists `rollback` with the text `Roll back the target to an earlier release of
+the registry.`
+
+The example [`03-commands`](examples/03-commands) writes this help. It also has an option text of
+two lines, whose second line `cli.Plain` writes at the column of the text.
+
 `App.Command` returns the command, and its method `Command` adds a subcommand. A command has a
 handler, subcommands or both. The options of a command apply to its subcommands as well. A
 subcommand reads them through an embedded pointer to their type. The package sets the pointer:
