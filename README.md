@@ -211,6 +211,7 @@ The command line follows the rules of GNU:
 - The argument `--` ends the flags.
 - The flags `-h` and `--help` write the help of the app or of the last command of the path.
 - The flag `--version` writes the version of an app that registers one.
+- The command `completion` writes the completion script of a shell.
 
 A run fails for an unknown command, flag or config key. The package suggests a similar command, long
 flag or key when the app declares one:
@@ -510,6 +511,60 @@ The flag `--version` follows these rules:
 
 `debug.ReadBuildInfo` returns the version of the main module as another source of the text. Since
 Go 1.24 `go build` sets that version from the tag or the commit of the checkout.
+
+## Completion
+
+The package adds the command `completion` to every app whose global options do not declare a
+positional argument. The command writes the completion script of bash, zsh, fish or PowerShell:
+
+| Shell | Install |
+|---|---|
+| bash 4.1 or later | `source <(srv completion bash)` in `~/.bashrc` |
+| zsh | `source <(srv completion zsh)` in `~/.zshrc`, after `compinit` |
+| fish | `srv completion fish > ~/.config/fish/completions/srv.fish` |
+| PowerShell | `srv completion powershell \| Out-String \| Invoke-Expression` in `$PROFILE` |
+
+For each TAB the script runs `srv completion SHELL -- WORDS...`, and the program writes the
+candidates for the last word with their help texts:
+
+```console
+$ srv completion zsh -- serve --
+--addr	Address to listen on.
+--config	Config file in JSON or INI.
+--flag-debug	Print the value and the source of each option before the command runs.
+--help	Show the help.
+--origins	Origins that may connect.
+--timeout	Timeout of a request.
+:values
+```
+
+The command derives the candidates from the declarations of the app:
+
+- It offers the commands and the subcommands with their help texts.
+- It offers the flags of the path with the help texts of their options. It leaves out a flag that
+  the words set already, unless the flag takes a list or a map.
+- It offers the values of an enum, and `true` and `false` for a bool.
+- It makes the shell offer the files with the extensions of the formats for a `ConfigFile`, and
+  every file for an `InputFile` and for a string.
+
+`App.Complete` registers a function that returns the candidates for the values of one type:
+
+```go
+type Plan string
+
+a.Complete[Plan](func(ctx context.Context, run *cli.Run[Global, Global], prefix string) ([]cli.Candidate, error) {
+	return []cli.Candidate{{Value: "api", Text: "The API."}, {Value: "web", Text: "The website."}}, nil
+})
+```
+
+The function receives the global options of the words, so it can read the config file of the
+command line. The example [`17-completion`](examples/17-completion) reads the plans of its config
+file this way, and its test runs each script in its shell.
+
+The command does not check the other options of the app, so a required option or a config file
+that does not decode leaves completion working. A command of the program cannot take the name
+`completion`. An app whose root takes positional arguments cannot have commands, so it does not
+complete.
 
 ## Errors and exit statuses
 
