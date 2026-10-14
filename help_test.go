@@ -145,6 +145,54 @@ func TestHelp(t *testing.T) {
 			},
 		)
 
+		summaries := []struct {
+			name string
+			give string
+		}{
+			{
+				name: "lists a subcommand with the first paragraph of its help text on one line",
+				give: "Migrate the database\nto the current schema.\n\nThe command applies each migration that the database lacks.",
+			},
+			{
+				name: "lists a subcommand with the first paragraph after the blank lines of its help text",
+				give: "\n  \nMigrate the database to the current schema.\r\n\r\nThe command applies each migration.",
+			},
+		}
+		for _, tt := range summaries {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+				r := &recorder{}
+				app := cli.New[struct{}](appName, appHelp)
+				db := app.Command[struct{}](parent, parentHelp, nil)
+				db.Command(
+					subcommand,
+					tt.give,
+					func(context.Context, *cli.Run[struct{}, struct{}]) error { return nil },
+				)
+				app.Render(r)
+				res := execute(t, app, []string{parent, "-h"}, nil, nil)
+				assert.NoError(t, res.err, "Execute writes the help")
+				assert.NotNil(t, r.help, "the renderer receives the help")
+				assert.Equal(t, r.help.Commands,
+					[]cli.HelpCommand{{Name: subcommand, Text: "Migrate the database to the current schema."}},
+					"the help lists the summary of the subcommand")
+			})
+		}
+
+		t.Run("writes the whole help text of a command in its own help", func(t *testing.T) {
+			t.Parallel()
+			r := &recorder{}
+			text := "Migrate the database\nto the current schema.\n\nThe command applies each migration that the database lacks."
+			app := cli.New[struct{}](appName, appHelp)
+			db := app.Command[struct{}](parent, parentHelp, nil)
+			db.Command(subcommand, text, func(context.Context, *cli.Run[struct{}, struct{}]) error { return nil })
+			app.Render(r)
+			res := execute(t, app, []string{parent, subcommand, "-h"}, nil, nil)
+			assert.NoError(t, res.err, "Execute writes the help")
+			assert.NotNil(t, r.help, "the renderer receives the help")
+			assert.Equal(t, r.help.Text, text, "the help of the subcommand contains its whole help text")
+		})
+
 		t.Run("writes the options of the ancestors of a subcommand as its global options", func(t *testing.T) {
 			t.Parallel()
 			app, _, _ := nesting[helpGlobal, Store, stepsOptions](t)

@@ -145,7 +145,7 @@ func (a *App[G]) offer(ctx context.Context, d *declaration[G], in *input[G], pre
 	case len(in.cmd.children) > 0:
 		candidates := make([]Candidate, len(in.cmd.children))
 		for i, b := range in.cmd.children {
-			candidates[i] = Candidate{Value: b.name, Text: b.help}
+			candidates[i] = Candidate{Value: b.name, Text: summary(b.help)}
 		}
 		return offer{candidates: candidates}, nil
 	default:

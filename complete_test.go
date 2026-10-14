@@ -336,19 +336,34 @@ func TestComplete(t *testing.T) {
 			assert.Equal(t, res.stdout, versionText+"\n", "Stdout receives the version")
 		})
 
-		t.Run("writes the first line of a help text", func(t *testing.T) {
+		t.Run("writes the first paragraph of the help text of a command on one line", func(t *testing.T) {
 			t.Parallel()
 			app := cli.New[struct{}](appName, appHelp)
 			app.Command(
 				command,
-				"Run the server.\nIt listens on --addr.",
+				"Run the server\nof the store.\n\nIt listens on --addr.",
 				func(context.Context, *cli.Run[struct{}, struct{}]) error {
 					return nil
 				},
 			)
 			res := execute(t, app, []string{completionCommand, shellZsh, wordsAfter, "s"}, nil, nil)
 			assert.NoError(t, res.err, "Execute runs the command completion")
-			assert.Equal(t, res.stdout, "serve\tRun the server.\n"+valuesLine, "Stdout receives the first line")
+			assert.Equal(t, res.stdout, "serve\tRun the server of the store.\n"+valuesLine,
+				"Stdout receives the first paragraph of the help text")
+		})
+
+		t.Run("writes the first line of the text of a candidate", func(t *testing.T) {
+			t.Parallel()
+			app := cli.New[completeGlobal](appName, appHelp)
+			app.Command(command, commandHelp, func(context.Context, *cli.Run[completeGlobal, struct {
+				Mode string `help:"Run mode.\nIt selects the store." enum:"dev,prod"`
+			}],
+			) error {
+				return nil
+			})
+			res := execute(t, app, []string{completionCommand, shellZsh, wordsAfter, command, "--m"}, nil, nil)
+			assert.NoError(t, res.err, "Execute runs the command completion")
+			assert.Equal(t, res.stdout, "--mode\tRun mode.\n"+valuesLine, "Stdout receives the first line of the text")
 		})
 
 		t.Run("returns ErrMissing for a missing shell", func(t *testing.T) {

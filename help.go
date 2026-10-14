@@ -30,10 +30,10 @@ const (
 )
 
 // helpOf returns the help of the last command of the path of in, which is the app before a command.
-// The help lists the subcommands, the positional arguments and the options of the command, and the
-// options of its ancestors as the global options. The reserved flags are options of the app. The
-// options have their config keys only when an option of the path is a config file, because a run
-// without a config file does not read a key.
+// The help lists the subcommands with the summaries of their help texts, the positional arguments
+// and the options of the command, and the options of its ancestors as the global options. The
+// reserved flags are options of the app. The options have their config keys only when an option of
+// the path is a config file, because a run without a config file does not read a key.
 func (a *App[G]) helpOf(in *input[G]) *Help {
 	b := in.cmd
 	h := &Help{App: a.name, Command: b.path, Text: b.help, Usage: []string{usageOptions}}
@@ -45,7 +45,7 @@ func (a *App[G]) helpOf(in *input[G]) *Help {
 		h.Usage = []string{name, usageOptions}
 	}
 	for _, c := range b.children {
-		h.Commands = append(h.Commands, HelpCommand{Name: c.name, Text: c.help})
+		h.Commands = append(h.Commands, HelpCommand{Name: c.name, Text: summary(c.help)})
 	}
 	own, inherited := b.options, b.inherited
 	if b.parent == nil {
@@ -72,6 +72,21 @@ func (a *App[G]) helpOf(in *input[G]) *Help {
 		}
 	}
 	return h
+}
+
+// summary returns the first paragraph of the help text help on one line. A paragraph ends at a blank
+// line, and the blank lines before the first paragraph do not count. Each run of white space becomes
+// one space.
+func summary(help string) string {
+	var words []string
+	for line := range strings.Lines(help) {
+		fields := strings.Fields(line)
+		if len(fields) == 0 && len(words) > 0 {
+			break
+		}
+		words = append(words, fields...)
+	}
+	return strings.Join(words, " ")
 }
 
 // reserved returns the flags that the package declares on every path of the app as bool options.
@@ -164,18 +179,26 @@ func writeSection(b *strings.Builder, heading string, rows [][3]string) {
 	writeRows(b, rows)
 }
 
-// writeRows writes rows to b as three columns, each as wide as its widest cell, without the spaces
-// at the end of a row.
+// writeRows writes rows to b as three columns, without the spaces at the end of a line. The first
+// column is as wide as its widest cell, and the second as the widest first line of its cells. A cell
+// of the second column continues on the lines below its row, each at the column of the cell.
 func writeRows(b *strings.Builder, rows [][3]string) {
 	var first, second int
 	for _, r := range rows {
+		line, _, _ := strings.Cut(r[1], "\n")
 		first = max(first, utf8.RuneCountInString(r[0]))
-		second = max(second, utf8.RuneCountInString(r[1]))
+		second = max(second, utf8.RuneCountInString(line))
 	}
+	margin := strings.Repeat(" ", len(indent)+first+len(columnGap))
 	for _, r := range rows {
-		line := indent + r[0] + strings.Repeat(" ", first-utf8.RuneCountInString(r[0])) + columnGap +
-			r[1] + strings.Repeat(" ", second-utf8.RuneCountInString(r[1])) + columnGap + r[2]
-		b.WriteString(strings.TrimRight(line, " "))
+		line, rest, _ := strings.Cut(r[1], "\n")
+		row := indent + r[0] + strings.Repeat(" ", first-utf8.RuneCountInString(r[0])) + columnGap +
+			line + strings.Repeat(" ", second-utf8.RuneCountInString(line)) + columnGap + r[2]
+		b.WriteString(strings.TrimRight(row, " "))
 		b.WriteString("\n")
+		for more := range strings.Lines(rest) {
+			b.WriteString(strings.TrimRight(margin+strings.TrimSuffix(more, "\n"), " "))
+			b.WriteString("\n")
+		}
 	}
 }

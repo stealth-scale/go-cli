@@ -550,6 +550,29 @@ func TestRender(t *testing.T) {
 				"Help writes the arguments and the options with their notes in columns")
 		})
 
+		t.Run("writes each further line of a text at the column of the text", func(t *testing.T) {
+			t.Parallel()
+			var out bytes.Buffer
+			err := cli.Plain{}.Help(&out, nil, &cli.Help{
+				App: appName,
+				Options: []cli.HelpOption{
+					{
+						Name:        "--mode",
+						Placeholder: "full|dry",
+						Text:        "Mode of the sync.\nThe mode dry writes nothing at all.\n",
+						Default:     `"full"`,
+					},
+					{Name: "--jobs", Placeholder: "int", Text: "Number of jobs.", Default: `"4"`},
+				},
+			})
+			assert.NoError(t, err, "Help writes the help")
+			assert.Equal(t, out.String(), "Usage: srv\n\nOptions:\n"+
+				"      --mode full|dry  Mode of the sync.  default \"full\"\n"+
+				"                       The mode dry writes nothing at all.\n"+
+				"      --jobs int       Number of jobs.    default \"4\"\n",
+				"Help aligns the notes with the first line of each text")
+		})
+
 		t.Run("leaves out the text of a help without text", func(t *testing.T) {
 			t.Parallel()
 			var out bytes.Buffer

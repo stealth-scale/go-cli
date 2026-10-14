@@ -34,7 +34,7 @@ type Help struct {
 // HelpCommand is a command or a subcommand in the help.
 type HelpCommand struct {
 	Name string // the name of the command, such as serve
-	Text string // the help text of the command
+	Text string // the first paragraph of the help text of the command, on one line
 }
 
 // HelpOption is an option or a positional argument in the help.
@@ -94,7 +94,9 @@ type Renderer interface {
 // in the columns of the help. A Renderer can embed Plain to replace only some of its methods.
 type Plain struct{}
 
-// Help writes the usage line, the text and the sections of h to w.
+// Help writes the usage line, the text and the sections of h to w. It writes each further line of
+// the text of a command or of an option below its row, and indents the line to the column of the
+// text.
 //
 // Error modes:
 //   - an error that wraps the error of w.

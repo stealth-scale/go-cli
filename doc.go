@@ -136,7 +136,9 @@
 // The flags -h and --help write the help of the last command of the path. The help lists the
 // options by name and the positional arguments in the order of their fields. It lists the options
 // of the ancestors of a command as its global options. It notes the config key of each option only
-// when an option of the path is a config file.
+// when an option of the path is a config file. It lists each subcommand with the first paragraph of
+// its help text on one line, so the help text of a command can continue with a description after a
+// blank line.
 //
 // [App.Version] registers the version of an app and declares the global flag --version. The program
 // builds the whole text of the version. A run with the flag writes the text and does not check the
