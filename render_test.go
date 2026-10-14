@@ -131,6 +131,20 @@ func TestRender(t *testing.T) {
 				"the renderer receives the text of the error as the message")
 		})
 
+		t.Run("passes the version of the app to the renderer", func(t *testing.T) {
+			t.Parallel()
+			r := &recorder{}
+			app := rendering(r, nil)
+			app.Version(versionText)
+			var out bytes.Buffer
+			env := &cli.Env{Environ: cli.Environ(map[string]string{"NO_COLOR": "1"}), Stdout: &out, Stderr: &out}
+			env.Args = []string{"--version"}
+			assert.NoError(t, app.Execute(t.Context(), env), "Execute writes the version")
+			expect.Equal(t, r.version, &cli.Version{App: appName, Text: versionText},
+				"the renderer receives the name of the app with the text of the version")
+			expect.Equal(t, r.environ, []string{"NO_COLOR=1"}, "the renderer receives the result of Environ")
+		})
+
 		t.Run("passes the environment of the Env to the renderer", func(t *testing.T) {
 			t.Parallel()
 			r := &recorder{}
@@ -145,6 +159,14 @@ func TestRender(t *testing.T) {
 			t.Parallel()
 			res := execute(t, rendering(&recorder{err: errRender}, nil), []string{"-h"}, nil, nil)
 			assert.Equal(t, res.err, errRender, "Execute returns the error of Help", assert.ByIdentity())
+		})
+
+		t.Run("returns the error of the version of the renderer unchanged", func(t *testing.T) {
+			t.Parallel()
+			app := rendering(&recorder{err: errRender}, nil)
+			app.Version(versionText)
+			res := execute(t, app, []string{"--version"}, nil, nil)
+			assert.Equal(t, res.err, errRender, "Execute returns the error of Version", assert.ByIdentity())
 		})
 
 		t.Run("returns the error of the help of a command line without a command unchanged", func(t *testing.T) {
@@ -216,6 +238,7 @@ func TestRender(t *testing.T) {
 			giveArgs []string
 		}{
 			{name: "opens no config file for the help", giveArgs: []string{"-c", "srv.json", "-h"}},
+			{name: "opens no config file for the version", giveArgs: []string{"-c", "srv.json", "--version"}},
 			{name: "opens no config file after a failed scan", giveArgs: []string{"-c", "srv.json", "--bogus"}},
 			{
 				name:     "opens no config file for a command without a handler",
@@ -274,6 +297,11 @@ func TestRender(t *testing.T) {
 			{
 				name:     "writes the help with the renderer of the sources",
 				giveArgs: []string{"--format", "json", "--help"},
+				wantJSON: true,
+			},
+			{
+				name:     "writes the version with the renderer of the sources",
+				giveArgs: []string{"--format", "json", "--version"},
 				wantJSON: true,
 			},
 			{
@@ -435,8 +463,27 @@ func TestRender(t *testing.T) {
 				"bad.json": {Data: []byte("{")},
 			}
 			token := prop.OneOf(
-				prop.SampledFrom(command, parent, subcommand, "--format", "json", "xml", "--format=json", "-c",
-					"srv.json", "bad.json", "--depth", "x", "--levels", "--bogus", "-h", "--flag-debug", "--", "-p"),
+				prop.SampledFrom(
+					command,
+					parent,
+					subcommand,
+					"--format",
+					"json",
+					"xml",
+					"--format=json",
+					"-c",
+					"srv.json",
+					"bad.json",
+					"--depth",
+					"x",
+					"--levels",
+					"--bogus",
+					"-h",
+					"--version",
+					"--flag-debug",
+					"--",
+					"-p",
+				),
 				prop.String(prop.MaxSize(6)),
 			)
 			prop.ForAll(t, "RenderFor does not change the error of a run", func(c *prop.Case) {
@@ -576,6 +623,26 @@ func TestRender(t *testing.T) {
 			assert.ErrorIs(t, err, errWrite, "Debug returns the error of the writer")
 			assert.Equal(t, err.Error(), "cli: write the output of --flag-debug: disk full",
 				"the error states the flag")
+		})
+	})
+
+	t.Run("Version", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("writes the text followed by a newline", func(t *testing.T) {
+			t.Parallel()
+			var out bytes.Buffer
+			text := "srv 1.4.2 (f70f638, 2026-10-13)\nCopyright Stealth Scale B.V. 2026"
+			err := cli.Plain{}.Version(&out, nil, &cli.Version{App: appName, Text: text})
+			assert.NoError(t, err, "Version writes the version")
+			assert.Equal(t, out.String(), text+"\n", "Version writes the text unchanged")
+		})
+
+		t.Run("returns an error that wraps the error of the writer", func(t *testing.T) {
+			t.Parallel()
+			err := cli.Plain{}.Version(failingWriter{}, nil, &cli.Version{App: appName, Text: versionText})
+			assert.ErrorIs(t, err, errWrite, "Version returns the error of the writer")
+			assert.Equal(t, err.Error(), "cli: write the version: disk full", "the error states the version")
 		})
 	})
 }

@@ -31,9 +31,9 @@ const (
 
 // helpOf returns the help of the last command of the path of in, which is the app before a command.
 // The help lists the subcommands, the positional arguments and the options of the command, and the
-// options of its ancestors as the global options. The flags of the help are options of the app.
-// The options have their config keys only when an option of the path is a config file, because a
-// run without a config file does not read a key.
+// options of its ancestors as the global options. The reserved flags are options of the app. The
+// options have their config keys only when an option of the path is a config file, because a run
+// without a config file does not read a key.
 func (a *App[G]) helpOf(in *input[G]) *Help {
 	b := in.cmd
 	h := &Help{App: a.name, Command: b.path, Text: b.help, Usage: []string{usageOptions}}
@@ -47,12 +47,11 @@ func (a *App[G]) helpOf(in *input[G]) *Help {
 	for _, c := range b.children {
 		h.Commands = append(h.Commands, HelpCommand{Name: c.name, Text: c.help})
 	}
-	help := &option{value: reflect.New(reflect.TypeFor[bool]()).Elem(), name: helpName, help: helpText, short: helpRune}
 	own, inherited := b.options, b.inherited
 	if b.parent == nil {
-		own = slices.Concat(own, []*option{help})
+		own = slices.Concat(own, a.reserved())
 	} else {
-		inherited = slices.Concat(inherited, []*option{help})
+		inherited = slices.Concat(inherited, a.reserved())
 	}
 	for _, o := range ordered(own) {
 		if o.arg {
@@ -73,6 +72,18 @@ func (a *App[G]) helpOf(in *input[G]) *Help {
 		}
 	}
 	return h
+}
+
+// reserved returns the flags that the package declares on every path of the app as bool options.
+// They are the flags of the help and the flag --version of an app with a version. The help lists
+// them with the options of the app, and an option of the app cannot declare them.
+func (a *App[G]) reserved() []*option {
+	t := reflect.TypeFor[bool]()
+	opts := []*option{{value: reflect.New(t).Elem(), name: helpName, help: helpText, short: helpRune}}
+	if a.version != "" {
+		opts = append(opts, &option{value: reflect.New(t).Elem(), name: versionFlag, help: versionHelp})
+	}
+	return opts
 }
 
 // helpOption returns o as an option of the help. The default of a secret option is masked.

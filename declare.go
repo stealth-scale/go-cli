@@ -157,7 +157,7 @@ func (a *App[G]) declare() (*declaration[G], error) {
 // Error modes:
 //   - the errors of check, of checkTree and of bindAll.
 func (a *App[G]) walk(b *binding[G], owner, noun string, children []*command[G], all []*option) ([]*option, error) {
-	if err := check(slices.Concat(b.inherited, b.options), b.path); err != nil {
+	if err := check(slices.Concat(b.inherited, b.options), b.path, a.reserved()); err != nil {
 		return nil, err
 	}
 	if err := b.checkTree(owner, noun, len(children)); err != nil {
@@ -424,11 +424,11 @@ func (o *option) withDefault(f *reflect.StructField) string {
 }
 
 // check returns an error that wraps ErrDeclaration when two options of opts declare one flag, one
-// short flag, one environment variable or one config key, when an option declares the flag of the
-// help, when two options are config files, and when the positional arguments of opts are out of
-// order: an argument after a list, or a required argument after an optional one. command is the
+// short flag, one environment variable or one config key, when an option declares one of the flags
+// of reserved, when two options are config files, and when the positional arguments of opts are out
+// of order: an argument after a list, or a required argument after an optional one. command is the
 // command of opts, or empty for the global options.
-func check(opts []*option, command string) error {
+func check(opts []*option, command string, reserved []*option) error {
 	owner := "the global options"
 	if command != "" {
 		owner = "the command " + command
@@ -453,8 +453,8 @@ func check(opts []*option, command string) error {
 			}
 			continue
 		}
-		if o.name == helpName {
-			return fmt.Errorf("%w: an option of %s declares the flag %s of the help", ErrDeclaration, owner, o.label())
+		if slices.ContainsFunc(reserved, func(r *option) bool { return r.name == o.name }) {
+			return fmt.Errorf("%w: an option of %s declares the reserved flag %s", ErrDeclaration, owner, o.label())
 		}
 		if o.config {
 			if config != nil {

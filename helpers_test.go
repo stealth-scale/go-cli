@@ -16,10 +16,11 @@ import (
 	"go.stealthscale.io/cli"
 )
 
-// The app and the commands that the specs run.
+// The app, its version and the commands that the specs run.
 const (
 	appName        = "srv"
 	appHelp        = "Serve the store."
+	versionText    = "srv 1.4.2 (f70f638, 2026-10-13)"
 	command        = "serve"
 	commandHelp    = "Run the server."
 	parent         = "db"
@@ -90,6 +91,7 @@ func (f brokenFile) Close() error {
 type recorder struct {
 	err     error
 	help    *cli.Help
+	version *cli.Version
 	failure *cli.Failure
 	environ []string
 	rows    []cli.DebugRow
@@ -98,6 +100,12 @@ type recorder struct {
 // Help records h and environ.
 func (r *recorder) Help(_ io.Writer, environ []string, h *cli.Help) error {
 	r.help, r.environ = h, environ
+	return r.err
+}
+
+// Version records v and environ.
+func (r *recorder) Version(_ io.Writer, environ []string, v *cli.Version) error {
+	r.version, r.environ = v, environ
 	return r.err
 }
 
@@ -137,12 +145,13 @@ func serving[G, C any](tb assert.TB) (*cli.App[G], *cli.Run[G, C]) {
 	return app, got
 }
 
-// formats returns the app srv with the global options formatGlobal, the command serve with the
-// options appOptions, and the command db with the subcommand migrate and without a handler. The
-// function of RenderFor appends the options of each call to got. It returns json for the format
-// json and text for any other format.
+// formats returns the app srv with the global options formatGlobal, the version versionText, the
+// command serve with the options appOptions, and the command db with the subcommand migrate and
+// without a handler. The function of RenderFor appends the options of each call to got. It returns
+// json for the format json and text for any other format.
 func formats(text, json *recorder, got *[]formatGlobal) *cli.App[formatGlobal] {
 	app := cli.New[formatGlobal](appName, appHelp)
+	app.Version(versionText)
 	app.Command(command, commandHelp, func(context.Context, *cli.Run[formatGlobal, appOptions]) error { return nil })
 	db := app.Command[struct{}](parent, parentHelp, nil)
 	db.Command(subcommand, subcommandHelp, func(context.Context, *cli.Run[formatGlobal, struct{}]) error {

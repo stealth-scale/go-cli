@@ -78,6 +78,15 @@ func nestedDeclared[G, P, C any](tb assert.TB) error {
 	return execute(tb, app, []string{"-h"}, nil, nil).err
 }
 
+// versionDeclared returns the error of a run of the app srv with the global options G, the version
+// versionText and the command serve with the options C.
+func versionDeclared[G, C any](tb assert.TB) error {
+	tb.Helper()
+	app, _ := serving[G, C](tb)
+	app.Version(versionText)
+	return execute(tb, app, []string{"-h"}, nil, nil).err
+}
+
 // TestDeclare checks the options that Execute declares for the fields of the options structs, and
 // the declarations that it refuses.
 func TestDeclare(t *testing.T) {
@@ -491,7 +500,17 @@ func TestDeclare(t *testing.T) {
 			{
 				name: "returns ErrDeclaration for an option with the flag of the help",
 				give: declared[struct{}, struct{ Help bool }],
-				want: "an option of the command serve declares the flag --help of the help",
+				want: "an option of the command serve declares the reserved flag --help",
+			},
+			{
+				name: "returns ErrDeclaration for a global option with the flag of the version",
+				give: versionDeclared[struct{ Version bool }, struct{}],
+				want: "an option of the global options declares the reserved flag --version",
+			},
+			{
+				name: "returns ErrDeclaration for an option of a command with the flag of the version",
+				give: versionDeclared[struct{}, struct{ Version string }],
+				want: "an option of the command serve declares the reserved flag --version",
 			},
 			{
 				name: "returns ErrDeclaration for two config files",
@@ -523,6 +542,14 @@ func TestDeclare(t *testing.T) {
 				assert.HasSuffix(t, err.Error(), tt.want, "the error states the invalid declaration")
 			})
 		}
+
+		t.Run("declares an option with the flag of the version in an app without a version", func(t *testing.T) {
+			t.Parallel()
+			app, got := serving[struct{}, struct{ Version string }](t)
+			res := execute(t, app, []string{command, "--version", "v2"}, nil, nil)
+			assert.NoError(t, res.err, "Execute runs the command")
+			assert.Equal(t, got.Config().Version, "v2", "the option has the value of the flag")
+		})
 
 		t.Run("returns ErrDeclaration for an app name that is not a name of lower-case words", func(t *testing.T) {
 			t.Parallel()

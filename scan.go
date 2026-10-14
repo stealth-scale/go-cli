@@ -32,11 +32,13 @@ const (
 // input is the command line of one run: the path of its command, its flags and its positional
 // arguments.
 type input[G any] struct {
-	cmd   *binding[G]  // the last command of the path, which starts at the app
-	list  []*option    // the options of the app and of each command of the path
-	flags []occurrence // the flags in the order of the command line
-	args  []string     // the positional arguments
-	help  bool         // the command line contains a flag of the help
+	cmd       *binding[G]  // the last command of the path, which starts at the app
+	list      []*option    // the options of the app and of each command of the path
+	flags     []occurrence // the flags in the order of the command line
+	args      []string     // the positional arguments
+	help      bool         // the command line contains a flag of the help
+	version   bool         // the command line contains the flag of the version
+	versioned bool         // the app has a version, so --version is the flag of the version
 }
 
 // occurrence is a flag of the command line with its value.
@@ -58,6 +60,9 @@ type occurrence struct {
 //     anywhere.
 //   - The argument -- ends the flags. A lone - is a positional argument.
 //
+// The flags -h and --help set in.help. The flag --version of an app with a version sets in.version.
+// These flags do not take a value.
+//
 // Error modes:
 //   - an *Error that wraps ErrUnknownCommand for a name that the command before it does not
 //     declare.
@@ -72,6 +77,8 @@ func (in *input[G]) scan(args []string) error {
 			return nil
 		case arg == helpLong:
 			in.help = true
+		case arg == versionLong && in.versioned:
+			in.version = true
 		case strings.HasPrefix(arg, flagPrefix):
 			next, err := in.long(args, i)
 			if err != nil {

@@ -138,6 +138,10 @@
 // of the ancestors of a command as its global options. It notes the config key of each option only
 // when an option of the path is a config file.
 //
+// [App.Version] registers the version of an app and declares the global flag --version. The program
+// builds the whole text of the version. A run with the flag writes the text and does not check the
+// other options and the positional arguments. The flags of the help take precedence over it.
+//
 // # Errors
 //
 // [App.Execute] returns an [*Error] for an invalid command line, environment variable or config
@@ -151,13 +155,13 @@
 //
 // # Output
 //
-// The [Renderer] of a run writes the help, the [Failure] of the run and the rows of --flag-debug.
-// [App.Render] registers one renderer for every run. [App.RenderFor] registers a function that
-// selects the renderer of each run from its global options, such as an option of the output format.
-// An app without a call uses [Plain], which writes plain text in columns. The module
-// go.stealthscale.io/cli/charm renders the same output with Lip Gloss. A renderer receives the
-// environment of the run from [Env.Environ], and [Run.Environ] returns that environment to a
-// handler.
+// The [Renderer] of a run writes the help, the [Version] of the app, the [Failure] of the run and
+// the rows of --flag-debug. [App.Render] registers one renderer for every run. [App.RenderFor]
+// registers a function that selects the renderer of each run from its global options, such as an
+// option of the output format. An app without a call uses [Plain], which writes plain text in
+// columns. The module go.stealthscale.io/cli/charm renders the same output with Lip Gloss. A
+// renderer receives the environment of the run from [Env.Environ], and [Run.Environ] returns that
+// environment to a handler.
 //
 // # Testing
 //

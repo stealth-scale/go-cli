@@ -22,10 +22,12 @@ type Help struct {
 	// Arguments contains the positional arguments of the command in the order of their fields.
 	Arguments []HelpOption
 	// Options contains the options of the command in the order of their flags. In the help of the
-	// app, Options contains the global options and the flags of the help.
+	// app, Options contains the global options, the flags of the help and the flag --version of an
+	// app with a version.
 	Options []HelpOption
 	// Globals contains the options of the ancestors of the command in the order of their flags. The
-	// flags of the help are among them. Globals is empty in the help of the app.
+	// flags of the help and the flag --version of an app with a version are among them. Globals is
+	// empty in the help of the app.
 	Globals []HelpOption
 }
 
@@ -47,6 +49,12 @@ type HelpOption struct {
 	Required    bool   // a run fails when no source sets the option
 }
 
+// Version contains the version of an app for a [Renderer].
+type Version struct {
+	App  string // the name of the app
+	Text string // the text that App.Version registers
+}
+
 // DebugRow is a row of the table of --flag-debug.
 type DebugRow struct {
 	Option string // the flag, or the label of a positional argument
@@ -64,15 +72,18 @@ type Failure struct {
 	Usage      bool   // the error is an invalid command line, environment variable or config file
 }
 
-// Renderer writes the help, the message of a failure and the table of --flag-debug in place of the
-// package. environ is the environment of the run as KEY=value pairs, which [Env.Environ] returns.
+// Renderer writes the help, the version, the message of a failure and the table of --flag-debug in
+// place of the package. environ is the environment of the run as KEY=value pairs, which
+// [Env.Environ] returns.
 //
 // The package calls a Renderer on the goroutine of [App.Execute] or [App.Main], and returns the
-// error of Help and of Debug unchanged. Concurrent runs of one app share its Renderer, so a
-// Renderer must be safe for concurrent use.
+// error of Help, of Version and of Debug unchanged. Concurrent runs of one app share its Renderer,
+// so a Renderer must be safe for concurrent use.
 type Renderer interface {
 	// Help writes the help h to w.
 	Help(w io.Writer, environ []string, h *Help) error
+	// Version writes the version v to w.
+	Version(w io.Writer, environ []string, v *Version) error
 	// Error writes the failure f to w.
 	Error(w io.Writer, environ []string, f *Failure) error
 	// Debug writes the rows of the table of --flag-debug to w.
@@ -115,6 +126,17 @@ func (Plain) Help(w io.Writer, _ []string, h *Help) error {
 	writeSection(&b, "Global options", plainRows(h.Globals))
 	if _, err := io.WriteString(w, b.String()); err != nil {
 		return fmt.Errorf("cli: write the help: %w", err)
+	}
+	return nil
+}
+
+// Version writes the text of v to w, followed by a newline.
+//
+// Error modes:
+//   - an error that wraps the error of w.
+func (Plain) Version(w io.Writer, _ []string, v *Version) error {
+	if _, err := io.WriteString(w, v.Text+"\n"); err != nil {
+		return fmt.Errorf("cli: write the version: %w", err)
 	}
 	return nil
 }
@@ -163,15 +185,15 @@ func (a *App[G]) Render(r Renderer) {
 
 // RenderFor registers render as the function that selects the renderer of each run. A run calls
 // render once with its global options. The renderer that render returns writes the help of the
-// run, its table of --flag-debug and the failure that [App.Main] writes. A later call of RenderFor
-// or [App.Render] replaces an earlier one.
+// run, its version, its table of --flag-debug and the failure that [App.Main] writes. A later call
+// of RenderFor or [App.Render] replaces an earlier one.
 //
 // The run applies every valid value of its sources before it calls render, also when its command
-// line does not scan, has a flag of the help or ends at a command without a handler. The flags
-// count up to the first fault of the command line, and a value that does not convert leaves its
-// option at the value of the earlier sources. A run whose declarations are invalid or whose Env is
-// incomplete passes the zero value of G. [Plain] writes the output of a run whose render returns
-// nil.
+// line does not scan, has a flag of the help or of the version, or ends at a command without a
+// handler. The flags count up to the first fault of the command line, and a value that does not
+// convert leaves its option at the value of the earlier sources. A run whose declarations are
+// invalid or whose Env is incomplete passes the zero value of G. [Plain] writes the output of a run
+// whose render returns nil.
 //
 // render runs on the goroutine of [App.Execute] or [App.Main]. Runs of the app can call it
 // concurrently, so render must be safe for concurrent use. It must not keep or change the options.

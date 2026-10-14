@@ -50,11 +50,12 @@ type (
 func executeBody(c *prop.Case) {
 	token := prop.OneOf(
 		prop.SampledFrom(command, "--port", "-p", "-vp8", "--tags", "--labels", "a=1", "--", "-", "-h", "--help",
-			"-c", "srv.json", "--port=x", "--verbose=maybe", "--flag-debug"),
+			"--version", "-c", "srv.json", "--port=x", "--verbose=maybe", "--flag-debug"),
 		prop.String(prop.MaxSize(6)),
 	)
 	args := c.Draw(prop.List(token, prop.MaxSize(8)), "args")
 	app := cli.New[appGlobal](appName, appHelp)
+	app.Version(versionText)
 	app.Command(command, commandHelp, func(context.Context, *cli.Run[appGlobal, appOptions]) error { return nil })
 	var out bytes.Buffer
 	files := fstest.MapFS{"srv.json": {Data: []byte(`{"serve": {"port": 7, "tags": ["a"]}}`)}}

@@ -15,6 +15,9 @@ import (
 	"go.stealthscale.io/cli"
 )
 
+// versionOption is the flag of the version in the help of an app with a version.
+var versionOption = cli.HelpOption{Name: "--version", Text: "Show the version."}
+
 // The options of the app in the tests of the help.
 type (
 	helpGlobal struct {
@@ -166,6 +169,30 @@ func TestHelp(t *testing.T) {
 			res := execute(t, app, []string{command, "-h"}, nil, nil)
 			assert.NoError(t, res.err, "Execute writes the help")
 			golden.Match(t, "help/bare-command.txt", []byte(res.stdout), golden.ShouldUpdate())
+		})
+
+		t.Run("lists the flag of the version among the options of the app", func(t *testing.T) {
+			t.Parallel()
+			r := &recorder{}
+			app := rendering(r, nil)
+			app.Version(versionText)
+			res := execute(t, app, []string{"-h"}, nil, nil)
+			assert.NoError(t, res.err, "Execute writes the help")
+			assert.NotNil(t, r.help, "the renderer receives the help")
+			assert.Equal(t, r.help.Options, slices.Concat(globalsHelp, []cli.HelpOption{versionOption}),
+				"the help of the app lists the flag after the global options")
+		})
+
+		t.Run("lists the flag of the version among the global options of a command", func(t *testing.T) {
+			t.Parallel()
+			r := &recorder{}
+			app := rendering(r, nil)
+			app.Version(versionText)
+			res := execute(t, app, []string{command, "-h"}, nil, nil)
+			assert.NoError(t, res.err, "Execute writes the help")
+			assert.NotNil(t, r.help, "the renderer receives the help")
+			assert.Equal(t, r.help.Globals, slices.Concat(globalsHelp, []cli.HelpOption{versionOption}),
+				"the help of the command lists the flag after the global options")
 		})
 
 		keys := []struct {

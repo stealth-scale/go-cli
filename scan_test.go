@@ -278,6 +278,15 @@ func TestScan(t *testing.T) {
 			})
 		}
 
+		t.Run("returns ErrUnknownFlag for the flag of the version with a value", func(t *testing.T) {
+			t.Parallel()
+			app, _ := serving[scanGlobal, scanOptions](t)
+			app.Version(versionText)
+			res := execute(t, app, []string{"--version=true"}, nil, nil)
+			assert.ErrorIs(t, res.err, cli.ErrUnknownFlag, "Execute returns ErrUnknownFlag")
+			assert.Equal(t, res.err.Error(), "cli: unknown flag --version", "the error states the flag")
+		})
+
 		t.Run("states the flag of an unknown flag in the *Error", func(t *testing.T) {
 			t.Parallel()
 			app, _ := serving[scanGlobal, scanOptions](t)

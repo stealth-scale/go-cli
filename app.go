@@ -13,10 +13,11 @@ import (
 
 // The exit statuses that [App.Main] returns.
 const (
-	// ExitOK is the status of a run whose handler succeeds, and of a run that writes the help.
+	// ExitOK is the status of a run whose handler succeeds, and of a run that writes the help or the
+	// version.
 	ExitOK = 0
 	// ExitFailure is the status of a run whose handler fails, whose declarations are invalid, whose
-	// Env is incomplete, or whose help or --flag-debug fails to write.
+	// Env is incomplete, or whose help, version or --flag-debug fails to write.
 	ExitFailure = 1
 	// ExitUsage is the status of a run with an invalid command line, environment variable or config
 	// file.
@@ -32,8 +33,8 @@ const (
 //
 // Execute and Main are safe for concurrent use once the last registration has returned. The
 // registrations are the calls of Command, Convert, Format, Handle, IgnoreKeys, LocateConfig, Render,
-// RenderFor and Use of the app, and of Command and Use of its commands. They are not safe for
-// concurrent use.
+// RenderFor, Use and Version of the app, and of Command and Use of its commands. They are not safe
+// for concurrent use.
 type App[G any] struct {
 	renderer   Renderer                                        // the renderer of Render, or nil after RenderFor
 	converters map[reflect.Type]converter                      // the conversions of Convert, and the built-in ones
@@ -43,6 +44,7 @@ type App[G any] struct {
 	locate     func(global *G, env *Env) (string, error)       // the function of LocateConfig, or nil
 	name       string
 	help       string
+	version    string        // the text of Version, or empty for an app without a version
 	commands   []*command[G] // the commands in the order of their registration
 	hooks      []Hook[G, G]  // the hooks of the app in the order of their registration
 	ignored    []string      // the config keys of IgnoreKeys, which the app decodes itself
@@ -108,6 +110,7 @@ func (a *App[G]) Use(hook Hook[G, G]) {
 // Execute runs the command that env.Args selects, and returns the error of its handler. The hooks of
 // the app and of each command of the path run around the handler, the app first. The flag -h or
 // --help writes the help of the last command of the path, or of the app, to env.Stdout and returns
+// nil. The flag --version of an app with [App.Version] writes the version to env.Stdout and returns
 // nil. A path that ends at a command without a handler writes the help of that command and a blank
 // line to env.Stderr. The blank line separates the help from the failure that [App.Main] writes.
 // The global flag --flag-debug writes the value and the source of each option to env.Stderr before
@@ -123,8 +126,8 @@ func (a *App[G]) Use(hook Hook[G, G]) {
 //   - an error that wraps [ErrDeclaration] for a registration or options that the app cannot run.
 //   - an [*Error] for an invalid command line, environment variable or config file, and for a path
 //     that ends at a command without a handler.
-//   - the error of the renderer, unchanged, when the help or the output of --flag-debug fails to
-//     write.
+//   - the error of the renderer, unchanged, when the help, the version or the output of
+//     --flag-debug fails to write.
 //   - an error that wraps the error of env.Stderr when the blank line after the help fails to
 //     write.
 //   - the error of the handler, unchanged, or the error that a hook returns in its place.
@@ -140,8 +143,8 @@ func (a *App[G]) Execute(ctx context.Context, env *Env) error {
 // also of a run whose Env is incomplete or whose declarations are invalid.
 //
 // A run of an app with [App.RenderFor] applies its sources also when the command line does not
-// scan, has a flag of the help or ends at a command without a handler, so the renderer of such a run
-// comes from the valid values of its sources.
+// scan, has a flag of the help or of the version, or ends at a command without a handler, so the
+// renderer of such a run comes from the valid values of its sources.
 //
 // Error modes:
 //   - the error modes of [App.Execute].
@@ -153,14 +156,15 @@ func (a *App[G]) ExecuteRenderer(ctx context.Context, env *Env) (Renderer, error
 	if err != nil {
 		return a.rendererOf(new(G)), err
 	}
-	in := &input[G]{cmd: d.root, list: d.root.options}
+	in := &input[G]{cmd: d.root, list: d.root.options, versioned: a.version != ""}
 	err = in.scan(env.Args)
 	switch {
-	case err == nil && !in.help && in.cmd.handle != nil:
+	case err == nil && !in.help && !in.version && in.cmd.handle != nil:
 		err = a.resolve(env, d, in)
 	case a.render != nil:
-		// Like a run of an app with Render, this run reports the error of its scan, its help or its
-		// missing command. The errors of this resolution come after those, so the run ignores them.
+		// Like a run of an app with Render, this run reports the error of its scan, its help, its
+		// version or its missing command. The errors of this resolution come after those, so the run
+		// ignores them.
 		_ = a.resolve(env, d, in)
 	}
 	r := a.rendererOf(d.global)
@@ -169,6 +173,8 @@ func (a *App[G]) ExecuteRenderer(ctx context.Context, env *Env) (Renderer, error
 		return r, in.locate(err)
 	case in.help:
 		return r, r.Help(env.Stdout, env.environ(), a.helpOf(in))
+	case in.version:
+		return r, r.Version(env.Stdout, env.environ(), &Version{App: a.name, Text: a.version})
 	case in.cmd.handle == nil:
 		if err := r.Help(env.Stderr, env.environ(), a.helpOf(in)); err != nil {
 			return r, err
