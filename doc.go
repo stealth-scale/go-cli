@@ -142,6 +142,17 @@
 // builds the whole text of the version. A run with the flag writes the text and does not check the
 // other options and the positional arguments. The flags of the help take precedence over it.
 //
+// # Completion
+//
+// The package adds the command completion to every app whose global options do not declare a
+// positional argument. completion bash writes the completion script of bash, and completion zsh,
+// completion fish and completion powershell write the scripts of the other shells. For each TAB the
+// script runs completion SHELL -- WORDS..., and the program writes the candidates for the last word.
+// The candidates are the commands, the flags, the values of an enum, and the files of a config
+// file, of an input file and of a string. [App.Complete] registers a function that returns the
+// [Candidate] values for the values of one type. The command does not check the other options of
+// the app, and a command of the program cannot take its name.
+//
 // # Errors
 //
 // [App.Execute] returns an [*Error] for an invalid command line, environment variable or config
@@ -180,7 +191,7 @@
 //
 // # Dependency position
 //
-// The package imports only the standard library: bytes, context, encoding, encoding/json, errors,
-// flag, fmt, io, io/fs, maps, net, net/url, os, path/filepath, reflect, regexp, slices, strconv,
-// strings, time, unicode and unicode/utf8.
+// The package imports only the standard library: bytes, context, embed, encoding, encoding/json,
+// errors, flag, fmt, io, io/fs, maps, net, net/url, os, path/filepath, reflect, regexp, slices,
+// strconv, strings, time, unicode and unicode/utf8.
 package cli

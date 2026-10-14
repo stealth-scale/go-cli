@@ -3,8 +3,9 @@ Usage: srv <command> [options]
 Serve the store.
 
 Commands:
-  serve    Run the server.
-  migrate  Run the migrations.
+  serve       Run the server.
+  migrate     Run the migrations.
+  completion  Write the completion script of a shell.
 
 Options:
   -c, --config file  Config file in JSON or INI.                                             env SRV_CONFIG

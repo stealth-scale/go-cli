@@ -1,4 +1,7 @@
-Usage: srv [options]
+Usage: srv [<command>] [options]
+
+Commands:
+  completion  Write the completion script of a shell.
 
 Options:
       --config file                                                                          env SRV_CONFIG

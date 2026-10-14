@@ -32,13 +32,15 @@ const (
 // input is the command line of one run: the path of its command, its flags and its positional
 // arguments.
 type input[G any] struct {
-	cmd       *binding[G]  // the last command of the path, which starts at the app
-	list      []*option    // the options of the app and of each command of the path
-	flags     []occurrence // the flags in the order of the command line
-	args      []string     // the positional arguments
-	help      bool         // the command line contains a flag of the help
-	version   bool         // the command line contains the flag of the version
-	versioned bool         // the app has a version, so --version is the flag of the version
+	cmd        *binding[G]  // the last command of the path, which starts at the app
+	pending    *option      // the option of a flag at the end of the command line without its value
+	list       []*option    // the options of the app and of each command of the path
+	flags      []occurrence // the flags in the order of the command line
+	args       []string     // the positional arguments
+	help       bool         // the command line contains a flag of the help
+	version    bool         // the command line contains the flag of the version
+	versioned  bool         // the app has a version, so --version is the flag of the version
+	terminated bool         // the command line contains the argument --
 }
 
 // occurrence is a flag of the command line with its value.
@@ -61,19 +63,21 @@ type occurrence struct {
 //   - The argument -- ends the flags. A lone - is a positional argument.
 //
 // The flags -h and --help set in.help. The flag --version of an app with a version sets in.version.
-// These flags do not take a value.
+// These flags do not take a value. The argument -- sets in.terminated.
 //
 // Error modes:
 //   - an *Error that wraps ErrUnknownCommand for a name that the command before it does not
 //     declare.
 //   - an *Error that wraps ErrUnknownFlag for a flag that no option of the path declares.
-//   - an *Error that wraps ErrMissing for a flag without its value at the end of args.
+//   - an *Error that wraps ErrMissing for a flag without its value at the end of args. scan sets
+//     in.pending to the option of the flag.
 func (in *input[G]) scan(args []string) error {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		switch {
 		case arg == terminator:
 			in.args = append(in.args, args[i+1:]...)
+			in.terminated = true
 			return nil
 		case arg == helpLong:
 			in.help = true
@@ -139,6 +143,7 @@ func (in *input[G]) long(args []string, i int) (int, error) {
 	case o.value.Kind() == reflect.Bool:
 		value = "true"
 	case i+1 == len(args):
+		in.pending = o
 		return i, &Error{Err: ErrMissing, Input: o.label(), text: "flag " + o.label() + " needs a value"}
 	default:
 		i++
@@ -185,6 +190,7 @@ func (in *input[G]) cluster(args []string, i int) (int, error) {
 			in.flags = append(in.flags, occurrence{opt: o, value: args[i+1]})
 			return i + 1, nil
 		default:
+			in.pending = o
 			return i, &Error{Err: ErrMissing, Input: o.label(), text: "flag " + o.label() + " needs a value"}
 		}
 	}

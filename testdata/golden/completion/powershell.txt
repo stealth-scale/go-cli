@@ -1,0 +1,44 @@
+# PowerShell completion of my-app.
+# Load it with: my-app completion powershell | Out-String | Invoke-Expression
+
+Register-ArgumentCompleter -Native -CommandName 'my-app' -ScriptBlock {
+    param($wordToComplete, $commandAst, $cursorPosition)
+    $words = @($commandAst.CommandElements |
+        Where-Object { $_.Extent.EndOffset -lt $cursorPosition } |
+        ForEach-Object { $_.Extent.Text })
+    $current = "$wordToComplete"
+    if ($current -eq '' -and ($PSVersionTable.PSVersion -lt [version]'7.3' -or $PSNativeCommandArgumentPassing -eq 'Legacy')) {
+        $current = '""'
+    }
+    $arguments = @($words | Select-Object -Skip 1) + $current
+    $lines = @(& $words[0] completion powershell -- @arguments 2>$null)
+    if ($lines.Count -eq 0) {
+        return
+    }
+    if ($lines[-1] -like ':files*') {
+        if ("$wordToComplete" -notmatch '^(-[^=]*=)(.*)$') {
+            return
+        }
+        $prefix, $path = $Matches[1], $Matches[2]
+        $exts = @(($lines[-1] -replace '^:files ?', '') -split ' ' | Where-Object { $_ })
+        $parent = Split-Path -Path $path -Parent
+        foreach ($item in @(Get-ChildItem -Path "$path*" -ErrorAction SilentlyContinue)) {
+            if (-not $item.PSIsContainer -and $exts.Count -gt 0 -and $exts -notcontains $item.Extension.TrimStart('.')) {
+                continue
+            }
+            $name = if ($parent) { Join-Path -Path $parent -ChildPath $item.Name } else { $item.Name }
+            if ($item.PSIsContainer) {
+                $name += [System.IO.Path]::DirectorySeparatorChar
+            }
+            [System.Management.Automation.CompletionResult]::new("$prefix$name", $name, 'ProviderItem', $name)
+        }
+        return
+    }
+    foreach ($line in @($lines | Select-Object -SkipLast 1)) {
+        $value, $text = $line -split "`t", 2
+        if (-not $text) {
+            $text = $value
+        }
+        [System.Management.Automation.CompletionResult]::new($value, $value, 'ParameterValue', $text)
+    }
+}

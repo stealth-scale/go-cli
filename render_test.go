@@ -55,11 +55,14 @@ func TestRender(t *testing.T) {
 			res := execute(t, rendering(r, nil), []string{"-h"}, nil, nil)
 			assert.NoError(t, res.err, "Execute writes the help")
 			assert.Equal(t, r.help, &cli.Help{
-				App:      appName,
-				Usage:    []string{"<command>", "[options]"},
-				Text:     appHelp,
-				Commands: []cli.HelpCommand{{Name: command, Text: commandHelp}},
-				Options:  globalsHelp,
+				App:   appName,
+				Usage: []string{"<command>", "[options]"},
+				Text:  appHelp,
+				Commands: []cli.HelpCommand{
+					{Name: command, Text: commandHelp},
+					{Name: "completion", Text: "Write the completion script of a shell."},
+				},
+				Options: globalsHelp,
 			}, "the renderer receives the usage, the text, the commands and the options of the app")
 		})
 

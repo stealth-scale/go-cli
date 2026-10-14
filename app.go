@@ -32,12 +32,13 @@ const (
 // # Concurrency
 //
 // Execute and Main are safe for concurrent use once the last registration has returned. The
-// registrations are the calls of Command, Convert, Format, Handle, IgnoreKeys, LocateConfig, Render,
-// RenderFor, Use and Version of the app, and of Command and Use of its commands. They are not safe
-// for concurrent use.
+// registrations are the calls of Command, Complete, Convert, Format, Handle, IgnoreKeys,
+// LocateConfig, Render, RenderFor, Use and Version of the app, and of Command and Use of its
+// commands. They are not safe for concurrent use.
 type App[G any] struct {
 	renderer   Renderer                                        // the renderer of Render, or nil after RenderFor
 	converters map[reflect.Type]converter                      // the conversions of Convert, and the built-in ones
+	completers map[reflect.Type]completer[G]                   // the functions of Complete by their type
 	formats    map[string]Format                               // the formats of config files by their extension in lower case
 	handle     func(ctx context.Context, run *Run[G, G]) error // the handler of the app, or nil
 	render     func(global *G) Renderer                        // the function of RenderFor, or nil after Render
@@ -59,6 +60,7 @@ func New[G any](name, help string) *App[G] {
 	return &App[G]{
 		renderer:   Plain{},
 		converters: builtins(),
+		completers: map[reflect.Type]completer[G]{},
 		formats:    map[string]Format{jsonExt: JSON, iniExt: INI},
 		name:       name,
 		help:       help,
@@ -111,11 +113,12 @@ func (a *App[G]) Use(hook Hook[G, G]) {
 // the app and of each command of the path run around the handler, the app first. The flag -h or
 // --help writes the help of the last command of the path, or of the app, to env.Stdout and returns
 // nil. The flag --version of an app with [App.Version] writes the version to env.Stdout and returns
-// nil. A path that ends at a command without a handler writes the help of that command and a blank
-// line to env.Stderr. The blank line separates the help from the failure that [App.Main] writes.
-// The global flag --flag-debug writes the value and the source of each option to env.Stderr before
-// the hooks run. The renderer of the run writes the help and the output of --flag-debug.
-// [App.RenderFor] describes how a run selects its renderer.
+// nil. The command completion writes a completion script or the candidates of a command line to
+// env.Stdout, as [App.Complete] describes. A path that ends at a command without a handler writes
+// the help of that command and a blank line to env.Stderr. The blank line separates the help from
+// the failure that [App.Main] writes. The global flag --flag-debug writes the value and the source
+// of each option to env.Stderr before the hooks run. The renderer of the run writes the help and the
+// output of --flag-debug. [App.RenderFor] describes how a run selects its renderer.
 //
 // Execute checks the options of every command before it reads the command line, so a run of any
 // command reports a declaration that the app cannot run. A run applies every valid value of its
@@ -130,6 +133,8 @@ func (a *App[G]) Use(hook Hook[G, G]) {
 //     --flag-debug fails to write.
 //   - an error that wraps the error of env.Stderr when the blank line after the help fails to
 //     write.
+//   - an error that wraps the error of env.Stdout when the command completion fails to write.
+//   - the error of a function of [App.Complete], unchanged.
 //   - the error of the handler, unchanged, or the error that a hook returns in its place.
 func (a *App[G]) Execute(ctx context.Context, env *Env) error {
 	_, err := a.ExecuteRenderer(ctx, env)
@@ -158,7 +163,12 @@ func (a *App[G]) ExecuteRenderer(ctx context.Context, env *Env) (Renderer, error
 	}
 	in := &input[G]{cmd: d.root, list: d.root.options, versioned: a.version != ""}
 	err = in.scan(env.Args)
+	completing := in.cmd.path == completionName
 	switch {
+	case err == nil && !in.help && !in.version && completing:
+		// The command completion checks its own arguments alone, so the options of the app do not
+		// fail it.
+		err = a.resolve(env, d, &input[G]{cmd: in.cmd, list: in.cmd.options, args: in.args})
 	case err == nil && !in.help && !in.version && in.cmd.handle != nil:
 		err = a.resolve(env, d, in)
 	case a.render != nil:
@@ -175,6 +185,8 @@ func (a *App[G]) ExecuteRenderer(ctx context.Context, env *Env) (Renderer, error
 		return r, r.Help(env.Stdout, env.environ(), a.helpOf(in))
 	case in.version:
 		return r, r.Version(env.Stdout, env.environ(), &Version{App: a.name, Text: a.version})
+	case completing:
+		return r, in.cmd.handle(ctx, &invocation[G]{global: d.global, env: env, command: in.cmd.path})
 	case in.cmd.handle == nil:
 		if err := r.Help(env.Stderr, env.environ(), a.helpOf(in)); err != nil {
 			return r, err

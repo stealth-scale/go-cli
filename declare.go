@@ -112,11 +112,12 @@ func (b *binding[G]) around(ctx context.Context, inv *invocation[G], next func(c
 	})
 }
 
-// declare returns the declaration of the app for one run.
+// declare returns the declaration of the app for one run. The command completion follows the
+// commands of the app when the global options do not declare a positional argument.
 //
 // Error modes:
-//   - an error that wraps ErrDeclaration for an invalid registration and for an app name that is
-//     not a name of lower-case words.
+//   - an error that wraps ErrDeclaration for an invalid registration, for an app name that is not a
+//     name of lower-case words, and for a command named completion.
 //   - the errors of options for the global options.
 //   - the errors of walk for the app and its commands.
 //   - the errors of keys for the config keys of the app.
@@ -128,6 +129,9 @@ func (a *App[G]) declare() (*declaration[G], error) {
 	if !namePattern.MatchString(a.name) {
 		return nil, fmt.Errorf("%w: the app name %q is not a name of lower-case words", ErrDeclaration, a.name)
 	}
+	if slices.ContainsFunc(a.commands, func(c *command[G]) bool { return c.name == completionName }) {
+		return nil, fmt.Errorf("%w: the command name %s is reserved", ErrDeclaration, completionName)
+	}
 	d := &declaration[G]{global: new(G), dicts: map[string]bool{}}
 	root := &scope{app: a.name, path: reflect.TypeFor[G]().String()}
 	globals, err := a.options(nil, reflect.ValueOf(d.global).Elem(), root)
@@ -138,6 +142,9 @@ func (a *App[G]) declare() (*declaration[G], error) {
 	d.root = newBinding(d.global, a.hooks, a.handle)
 	d.root.options, d.root.help = slices.Concat(globals, []*option{d.debug}), a.help
 	all, err := a.walk(d.root, "the app "+a.name, "commands", a.commands, nil)
+	if err == nil && !slices.ContainsFunc(globals, func(o *option) bool { return o.arg }) {
+		all, err = a.bindAll(d.root, []*command[G]{a.completionCommand(d)}, all)
+	}
 	if err != nil {
 		return nil, err
 	}
