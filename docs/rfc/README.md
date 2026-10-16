@@ -17,3 +17,4 @@ Proposals, and the argument that produced them. An RFC is written to be argued w
 | [0006](0006-ignored-keys-and-a-located-config-file.md) | Ignored config keys and a located config file | Accepted |
 | [0007](0007-the-renderer-and-the-failure-of-a-run.md) | The renderer and the failure of a run for a caller of Execute | Accepted |
 | [0008](0008-shell-completion.md) | Shell completion for bash, zsh, fish and PowerShell | Accepted |
+| [0009](0009-decoding-a-document.md) | Decoding a document into the values of a program | Accepted |
