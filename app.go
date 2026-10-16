@@ -37,7 +37,7 @@ const (
 // commands. They are not safe for concurrent use.
 type App[G any] struct {
 	renderer   Renderer                                        // the renderer of Render, or nil after RenderFor
-	converters map[reflect.Type]converter                      // the conversions of Convert, and the built-in ones
+	converters conversions                                     // the conversions of Convert, and the built-in ones
 	completers map[reflect.Type]completer[G]                   // the functions of Complete by their type
 	formats    map[string]Format                               // the formats of config files by their extension in lower case
 	handle     func(ctx context.Context, run *Run[G, G]) error // the handler of the app, or nil

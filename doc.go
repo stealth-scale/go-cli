@@ -114,6 +114,19 @@
 // function that returns the path of the config file when neither the flag nor the environment
 // variable of the option sets it, such as a search from a directory upward.
 //
+// # Documents
+//
+// [Decode] decodes one member of the tree that a [Format] returns into a value of the program, such
+// as one section of a document. It derives the member of each field as a run derives the config key
+// of an option, and it converts each value by the rules of options. An embedded struct and an
+// exported embedded pointer to a struct add their fields to the object of their parent.
+//
+// A field without a member keeps its value, so the value can start at the baseline of the program.
+// An array replaces a list, and an object replaces a map. A list or a map of structs takes an array
+// or an object of objects, and a pointer to a struct takes an object. Decode creates each struct of
+// a list or a map and the target of a nil pointer with the defaults of their tags. A member without
+// a field fails with [ErrUnknownKey], and Decode changes the value only when it returns nil.
+//
 // # Input files
 //
 // An option of the type [InputFile] is the path of an input file, and the path - is the standard
@@ -166,6 +179,9 @@
 // [App.Failure] returns the [Failure] that Main writes, so a program with exit statuses or streams
 // of its own writes the failure itself.
 //
+// [Decode] returns an [*Error] that wraps [ErrUnknownKey], [ErrMissing] or [ErrInvalidValue] for an
+// invalid document, and an error that wraps [ErrDeclaration] for a value that it cannot decode into.
+//
 // # Output
 //
 // The [Renderer] of a run writes the help, the [Version] of the app, the [Failure] of the run and
@@ -189,7 +205,7 @@
 // # Concurrency
 //
 // [App.Execute] and [App.Main] are safe for concurrent use once the registrations have returned.
-// Each run has options of its own.
+// Each run has options of its own. Concurrent calls of [Decode] can share one tree.
 //
 // # Dependency position
 //

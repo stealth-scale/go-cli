@@ -28,11 +28,15 @@ var (
 // convert, which a message states after the input and its source.
 type converter func(s string) (reflect.Value, string)
 
+// conversions are the conversions of the types of fields by their type: the built-in ones, and in an
+// app the ones that [App.Convert] registers.
+type conversions map[reflect.Type]converter
+
 // builtins returns the conversions of the standard types that have no text method of their own:
 // url.URL and *url.URL through url.Parse, *time.Location through time.LoadLocation, net.IPNet and
 // *net.IPNet through net.ParseCIDR, and fs.FileMode as an octal number such as 0644 or 0o644.
-func builtins() map[reflect.Type]converter {
-	return map[reflect.Type]converter{
+func builtins() conversions {
+	return conversions{
 		reflect.TypeFor[*url.URL]():       convertWith(url.Parse),
 		reflect.TypeFor[*time.Location](): convertWith(time.LoadLocation),
 		reflect.TypeFor[url.URL](): func(s string) (reflect.Value, string) {
@@ -60,6 +64,39 @@ func builtins() map[reflect.Type]converter {
 			n, err := strconv.ParseUint(strings.TrimPrefix(s, "0o"), 8, 32)
 			return kindValue(reflect.TypeFor[fs.FileMode](), err, func(v reflect.Value) { v.SetUint(n) })
 		},
+	}
+}
+
+// converter returns the conversion of a text to a value of the type t, or nil for a type without
+// one. It tries, in order, the conversion of t in c, encoding.TextUnmarshaler and flag.Value of a
+// pointer to t, time.Duration, and the kinds string, bool, int, uint and float.
+func (c conversions) converter(t reflect.Type) converter {
+	if conv, ok := c[t]; ok {
+		return conv
+	}
+	switch p := reflect.PointerTo(t); {
+	case p.Implements(textUnmarshalerType):
+		return func(s string) (reflect.Value, string) {
+			v := reflect.New(t)
+			u, _ := reflect.TypeAssert[encoding.TextUnmarshaler](v)
+			if err := u.UnmarshalText([]byte(s)); err != nil {
+				return reflect.Value{}, err.Error()
+			}
+			return v.Elem(), ""
+		}
+	case p.Implements(flagValueType):
+		return func(s string) (reflect.Value, string) {
+			v := reflect.New(t)
+			f, _ := reflect.TypeAssert[flag.Value](v)
+			if err := f.Set(s); err != nil {
+				return reflect.Value{}, err.Error()
+			}
+			return v.Elem(), ""
+		}
+	case t == durationType:
+		return convertWith(time.ParseDuration)
+	default:
+		return kindConverter(t)
 	}
 }
 
@@ -136,38 +173,4 @@ func (a *App[G]) Convert[T any](parse func(s string) (T, error)) {
 		return
 	}
 	a.converters[reflect.TypeFor[T]()] = convertWith(parse)
-}
-
-// converter returns the conversion of a text to a value of the type t, or nil for a type that the
-// app cannot convert. It tries, in order, the conversion that Convert registered or a built-in
-// one, encoding.TextUnmarshaler and flag.Value of a pointer to t, time.Duration, and the kinds
-// string, bool, int, uint and float.
-func (a *App[G]) converter(t reflect.Type) converter {
-	if c, ok := a.converters[t]; ok {
-		return c
-	}
-	switch p := reflect.PointerTo(t); {
-	case p.Implements(textUnmarshalerType):
-		return func(s string) (reflect.Value, string) {
-			v := reflect.New(t)
-			u, _ := reflect.TypeAssert[encoding.TextUnmarshaler](v)
-			if err := u.UnmarshalText([]byte(s)); err != nil {
-				return reflect.Value{}, err.Error()
-			}
-			return v.Elem(), ""
-		}
-	case p.Implements(flagValueType):
-		return func(s string) (reflect.Value, string) {
-			v := reflect.New(t)
-			f, _ := reflect.TypeAssert[flag.Value](v)
-			if err := f.Set(s); err != nil {
-				return reflect.Value{}, err.Error()
-			}
-			return v.Elem(), ""
-		}
-	case t == durationType:
-		return convertWith(time.ParseDuration)
-	default:
-		return kindConverter(t)
-	}
 }

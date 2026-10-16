@@ -8,44 +8,54 @@ import "errors"
 // prefix starts the text of every error of the package.
 const prefix = "cli: "
 
-// The sentinels of the errors of [App.Execute]. An [*Error] wraps one of the first seven, and an
-// error that wraps one of the last two reports a defect of the program.
+// The sentinels of the errors of [App.Execute] and [Decode]. An [*Error] wraps one of the first
+// seven, and an error that wraps one of the last two reports a defect of the program.
 var (
 	// ErrUnknownCommand reports a command that the app or the command before it does not declare.
 	ErrUnknownCommand = errors.New("cli: unknown command")
 	// ErrUnknownFlag reports a flag that the app and the commands of the path do not declare.
 	ErrUnknownFlag = errors.New("cli: unknown flag")
-	// ErrUnknownKey reports a key of a config file that no option of the app declares.
+	// ErrUnknownKey reports a key of a config file that no option of the app declares, and a member
+	// of a document without a field.
 	ErrUnknownKey = errors.New("cli: unknown config key")
-	// ErrMissing reports a missing command, a flag without its value, a missing positional argument
-	// and a required option without a value.
+	// ErrMissing reports a missing command, a flag without its value, a missing positional argument,
+	// a required option without a value, and an object of a document without the member of a
+	// required field.
 	ErrMissing = errors.New("cli: missing input")
 	// ErrInvalidValue reports a value that does not convert to the type of its field, a value that the
-	// enum of its option excludes, and two or more values for an option that takes one.
+	// enum of its option excludes, two or more values for an option that takes one, and a member of a
+	// document of a kind that its field does not take.
 	ErrInvalidValue = errors.New("cli: invalid value")
 	// ErrUnexpectedArgument reports a positional argument that the command does not declare.
 	ErrUnexpectedArgument = errors.New("cli: unexpected argument")
 	// ErrConfigFile reports a config file without a format, a config file that the run cannot read,
 	// and a config file that its format cannot decode.
 	ErrConfigFile = errors.New("cli: unreadable config file")
-	// ErrDeclaration reports a registration or options that the app cannot run. [App.Execute]
-	// returns it before it reads the command line, for every command of the app.
+	// ErrDeclaration reports a registration or options that the app cannot run, and a value that
+	// [Decode] cannot decode into. [App.Execute] returns it before it reads the command line, for
+	// every command of the app.
 	ErrDeclaration = errors.New("cli: invalid declaration")
 	// ErrEnv reports a nil [Env], and an Env without Stdout or Stderr.
 	ErrEnv = errors.New("cli: incomplete env")
 )
 
-// Error is an invalid input of a run: an argument, an environment variable or a config file. Err is
-// one of [ErrUnknownCommand], [ErrUnknownFlag], [ErrUnknownKey], [ErrMissing], [ErrInvalidValue],
-// [ErrUnexpectedArgument] and [ErrConfigFile], and errors.Is matches it.
+// Error is an invalid input of a run or of [Decode]: an argument, an environment variable, a config
+// file or a member of a document. Err is one of [ErrUnknownCommand], [ErrUnknownFlag],
+// [ErrUnknownKey], [ErrMissing], [ErrInvalidValue], [ErrUnexpectedArgument] and [ErrConfigFile], and
+// errors.Is matches it.
 //
 // # Concurrency
 //
-// An Error does not change after [App.Execute] returns it, so any number of goroutines may read it.
+// An Error does not change after [App.Execute] or [Decode] returns it, so any number of goroutines
+// may read it.
 type Error struct {
-	Err        error  // the sentinel
-	Command    string // the path of the command of the input, such as db migrate, or empty for the app
-	Input      string // the command, the flag, the config key, the argument or the config file at fault
+	Err error // the sentinel
+	// Command is the path of the command of the input, such as db migrate, or empty for the app and
+	// for a document.
+	Command string
+	// Input is the command, the flag, the config key, the argument, the config file or the key of the
+	// member of a document at fault.
+	Input      string
 	Value      string // the value at fault, or empty
 	Suggestion string // the name that the package suggests in place of Input, or empty
 	text       string // the message without the package name, the command and the suggestion

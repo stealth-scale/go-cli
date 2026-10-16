@@ -85,6 +85,23 @@ func (s *scope) names(name string) (flag, env, key string) {
 	return flag, env, key
 }
 
+// fieldName returns the name of the field f: its tag name, or its Go name in kebab case. field is
+// the Go path of the field in a message, such as main.Serve.Addr.
+//
+// Error modes:
+//   - an error that wraps ErrDeclaration for a name that is not a name of lower-case words.
+func fieldName(f *reflect.StructField, field string) (string, error) {
+	name := kebab(f.Name)
+	if tagged, ok := f.Tag.Lookup(string(tagName)); ok {
+		name = tagged
+	}
+	if !namePattern.MatchString(name) {
+		return "", fmt.Errorf("%w: the field %s has the name %q, which is not a name of lower-case words",
+			ErrDeclaration, field, name)
+	}
+	return name, nil
+}
+
 // kebab returns field, the name of a Go field, in kebab case. A word starts at an upper-case letter
 // that follows a lower-case letter or a digit, and at the last upper-case letter of an acronym that
 // a lower-case letter follows. DryRun is dry-run, HTTPPort is http-port and HTTP2Port is

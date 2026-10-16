@@ -249,18 +249,18 @@ func (a *App[G]) options(opts []*option, v reflect.Value, s *scope) ([]*option, 
 	}
 	for f, field := range v.Fields() {
 		embedded := f.Anonymous && f.Type.Kind() == reflect.Pointer
-		if embedded && f.Type.Elem().Kind() == reflect.Struct && a.converter(f.Type.Elem()) == nil {
+		if embedded && f.Type.Elem().Kind() == reflect.Struct && a.converters.converter(f.Type.Elem()) == nil {
 			if err := s.inherit(&f, field); err != nil {
 				return nil, err
 			}
 			continue
 		}
-		group := f.Type.Kind() == reflect.Struct && a.converter(f.Type) == nil
+		group := f.Type.Kind() == reflect.Struct && a.converters.converter(f.Type) == nil
 		if !f.IsExported() && (!group || !f.Anonymous) {
 			continue
 		}
 		if !group {
-			o, err := a.newOption(&f, field, s)
+			o, err := a.converters.newOption(&f, field, s)
 			if err != nil {
 				return nil, err
 			}
@@ -278,29 +278,25 @@ func (a *App[G]) options(opts []*option, v reflect.Value, s *scope) ([]*option, 
 	return opts, nil
 }
 
-// newOption returns the option of the field f with the value v in the scope s.
+// newOption returns the option of the field f with the value v in the scope s, with the conversions
+// of c.
 //
 // Error modes:
-//   - an error that wraps ErrDeclaration for a tag prefix, a type without a conversion, a name that
-//     is not a name of lower-case words, a short flag that is not one ASCII letter other than h, an
-//     empty tag env or key, a config key with an empty name, and for the reasons of argument,
-//     configFile and withDefault.
-func (a *App[G]) newOption(f *reflect.StructField, v reflect.Value, s *scope) (*option, error) {
+//   - an error that wraps ErrDeclaration for a tag prefix, a type without a conversion, a short flag
+//     that is not one ASCII letter other than h, an empty tag env or key, a config key with an empty
+//     name, and for the reasons of fieldName, argument, configFile and withDefault.
+func (c conversions) newOption(f *reflect.StructField, v reflect.Value, s *scope) (*option, error) {
 	field := s.path + "." + f.Name
 	if _, ok := f.Tag.Lookup(string(tagPrefix)); ok {
 		return nil, fmt.Errorf("%w: the field %s is no group, so it takes no tag prefix", ErrDeclaration, field)
 	}
 	o := &option{value: v, help: f.Tag.Get(string(tagHelp)), config: f.Type == configFileType}
-	if reason := a.setShape(o, f.Type); reason != "" {
+	if reason := c.setShape(o, f.Type); reason != "" {
 		return nil, fmt.Errorf("%w: the field %s %s", ErrDeclaration, field, reason)
 	}
-	name := kebab(f.Name)
-	if tagged, ok := f.Tag.Lookup(string(tagName)); ok {
-		name = tagged
-	}
-	if !namePattern.MatchString(name) {
-		return nil, fmt.Errorf("%w: the field %s has the name %q, which is not a name of lower-case words",
-			ErrDeclaration, field, name)
+	name, err := fieldName(f, field)
+	if err != nil {
+		return nil, err
 	}
 	o.name, o.env, o.key = s.names(name)
 	_, o.required = f.Tag.Lookup(string(tagRequired))
@@ -352,21 +348,21 @@ func (a *App[G]) newOption(f *reflect.StructField, v reflect.Value, s *scope) (*
 	return o, nil
 }
 
-// setShape sets the shape of o and the conversions of its values for the field type t: a scalar
-// for a type with a conversion, and a list, a map or a pointer for a slice, a map or a pointer
-// whose elements have a conversion. It returns the reason when t has no shape: a type without a
-// conversion, and a list, a map or a pointer of ConfigFile.
-func (a *App[G]) setShape(o *option, t reflect.Type) string {
+// setShape sets the shape of o and the conversions of its values for the field type t, with the
+// conversions of c: a scalar for a type with a conversion, and a list, a map or a pointer for a
+// slice, a map or a pointer whose elements have a conversion. It returns the reason when t has no
+// shape: a type without a conversion, and a list, a map or a pointer of ConfigFile.
+func (c conversions) setShape(o *option, t reflect.Type) string {
 	switch {
-	case a.converter(t) != nil:
-		o.shape, o.conv = scalar, a.converter(t)
+	case c.converter(t) != nil:
+		o.shape, o.conv = scalar, c.converter(t)
 		return ""
-	case t.Kind() == reflect.Slice && a.converter(t.Elem()) != nil:
-		o.shape, o.conv = list, a.converter(t.Elem())
-	case t.Kind() == reflect.Map && a.converter(t.Key()) != nil && a.converter(t.Elem()) != nil:
-		o.shape, o.conv, o.keyConv = dict, a.converter(t.Elem()), a.converter(t.Key())
-	case t.Kind() == reflect.Pointer && a.converter(t.Elem()) != nil:
-		o.shape, o.conv = pointer, a.converter(t.Elem())
+	case t.Kind() == reflect.Slice && c.converter(t.Elem()) != nil:
+		o.shape, o.conv = list, c.converter(t.Elem())
+	case t.Kind() == reflect.Map && c.converter(t.Key()) != nil && c.converter(t.Elem()) != nil:
+		o.shape, o.conv, o.keyConv = dict, c.converter(t.Elem()), c.converter(t.Key())
+	case t.Kind() == reflect.Pointer && c.converter(t.Elem()) != nil:
+		o.shape, o.conv = pointer, c.converter(t.Elem())
 	default:
 		return "has the type " + t.String() + ", which has no conversion"
 	}
