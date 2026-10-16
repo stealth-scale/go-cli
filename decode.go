@@ -331,18 +331,18 @@ func (st *docStruct) setDefaults(v reflect.Value) error {
 	return nil
 }
 
-// docMember is a member of the object of a struct. It has the steps from the struct to the field of
-// the member and the part of the type of the field.
-type docMember struct {
-	part  *part
-	steps []step
-}
-
 // step is a field on the way from a struct to the field of a member. target is the struct that the
 // field points to when the field is a pointer, and nil for any other field.
 type step struct {
 	target *docStruct
 	index  int
+}
+
+// docMember is a member of the object of a struct. It has the steps from the struct to the field of
+// the member and the part of the type of the field.
+type docMember struct {
+	part  *part
+	steps []step
 }
 
 // docInit is the default of a field of a new struct, or the defaults of a group of the struct.
@@ -354,18 +354,18 @@ type docInit struct {
 	field reflect.StructField
 }
 
+// fieldKey is a field of a struct type, by the type and the index of the field.
+type fieldKey struct {
+	typ   reflect.Type
+	index int
+}
+
 // document is the declaration of the types of one call of [Decode]. It has the conversions of the
 // call, the struct of each type that the call declares and the part of each field of those types.
 type document struct {
 	conv    conversions
 	structs map[reflect.Type]*docStruct
 	fields  map[fieldKey]*part
-}
-
-// fieldKey is a field of a struct type, by the type and the index of the field.
-type fieldKey struct {
-	typ   reflect.Type
-	index int
 }
 
 // partOf returns the part of the type t. f is the field of t in the struct of the scope s, or nil
@@ -441,25 +441,6 @@ func (d *document) valueOf(t reflect.Type, f *reflect.StructField, s *scope) (*p
 	return &part{typ: t, opt: o, form: valueForm}, nil
 }
 
-// fieldPart returns the part of the field f of the struct type t in the scope s. It declares each
-// field once in a call of Decode, so the default of a field that two structs contain through an
-// embedded pointer converts once.
-//
-// Error modes:
-//   - the errors of partOf.
-func (d *document) fieldPart(t reflect.Type, f *reflect.StructField, s *scope) (*part, error) {
-	k := fieldKey{typ: t, index: f.Index[0]}
-	if p, ok := d.fields[k]; ok {
-		return p, nil
-	}
-	p, err := d.partOf(f.Type, f, s)
-	if err != nil {
-		return nil, err
-	}
-	d.fields[k] = p
-	return p, nil
-}
-
 // structOf returns the struct of the struct type t. It declares each type once in a call of Decode,
 // so it also declares a type that refers to itself through a pointer, a list or a map once.
 //
@@ -484,8 +465,7 @@ func (d *document) structOf(t reflect.Type) (*docStruct, error) {
 // the pointer. A default of t is a default of st when no step of prefix is a pointer.
 //
 // Error modes:
-//   - an error that wraps ErrDeclaration for an embedded pointer to a struct that contains the
-//     pointer, and for a field whose name is not a name of lower-case words.
+//   - an error that wraps ErrDeclaration for a field whose name is not a name of lower-case words.
 //   - the errors of nest, of fieldPart, of flatten and of docStruct.add.
 func (d *document) addFields(st *docStruct, t reflect.Type, prefix []step, s *scope) error {
 	own := !slices.ContainsFunc(prefix, func(p step) bool { return p.target != nil })
@@ -539,6 +519,25 @@ func (d *document) addFields(st *docStruct, t reflect.Type, prefix []step, s *sc
 		}
 	}
 	return nil
+}
+
+// fieldPart returns the part of the field f of the struct type t in the scope s. It declares each
+// field once in a call of Decode, so the default of a field that two structs contain through an
+// embedded pointer converts once.
+//
+// Error modes:
+//   - the errors of partOf.
+func (d *document) fieldPart(t reflect.Type, f *reflect.StructField, s *scope) (*part, error) {
+	k := fieldKey{typ: t, index: f.Index[0]}
+	if p, ok := d.fields[k]; ok {
+		return p, nil
+	}
+	p, err := d.partOf(f.Type, f, s)
+	if err != nil {
+		return nil, err
+	}
+	d.fields[k] = p
+	return p, nil
 }
 
 // flatten adds the fields of t to st at steps in the scope s. t is the type of an embedded struct,
