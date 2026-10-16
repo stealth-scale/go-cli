@@ -1,5 +1,16 @@
 # go.stealthscale.io/cli/examples
 
+## 0.0.7
+
+### Patch Changes
+
+- bdd2fb7: Decode the plans of the example `16-workspace` with `cli.Decode`.
+- Updated dependencies [4dc4317]
+  - go.stealthscale.io/cli@0.6.0
+  - go.stealthscale.io/cli/charm@0.2.2
+  - go.stealthscale.io/cli/toml@0.1.6
+  - go.stealthscale.io/cli/yaml@0.1.6
+
 ## 0.0.6
 
 ### Patch Changes

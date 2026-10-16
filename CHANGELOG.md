@@ -1,5 +1,11 @@
 # go.stealthscale.io/cli
 
+## 0.6.0
+
+### Minor Changes
+
+- 4dc4317: Add `cli.Decode` to decode a member of the tree of a format into a value of the program.
+
 ## 0.5.1
 
 ### Patch Changes
