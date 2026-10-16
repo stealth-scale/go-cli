@@ -440,7 +440,7 @@ srv: serve: unknown key serve.adr in srv.json (did you mean serve.addr?)
 
 A config file can also contain keys that the program decodes itself, such as the plans of a
 workspace. `App.IgnoreKeys` registers them. A run skips each such key and every key below it, and
-the handler reads them from the file at the path of the option:
+the handler decodes them from the file at the path of the option with `cli.Decode`:
 
 ```go
 a.IgnoreKeys("version", "plans")
@@ -458,8 +458,88 @@ a.LocateConfig(func(g *Global, env *cli.Env) (string, error) {
 ```
 
 `--flag-debug` shows a located path with the source `located`. The example
-[`16-workspace`](examples/16-workspace) searches for its workspace file and decodes its plans
-itself.
+[`16-workspace`](examples/16-workspace) searches for its workspace file and decodes its plans with
+`cli.Decode`.
+
+## Documents
+
+`cli.Decode` decodes one member of the tree of a format into a value of the program. A program
+decodes a document that is not the options of a command this way, such as a section of a file of
+its own or the keys that `App.IgnoreKeys` leaves to a handler. `Decode` derives the member of each
+field as a run derives the config key of an option, and it converts each value by the same rules:
+
+```go
+type Command struct {
+	Name      string `required:""`
+	Main      string `default:"."`
+	Platforms []string
+}
+
+type Fuzz struct {
+	Time string
+	Args []string
+}
+
+type Sign struct {
+	Key string `required:""`
+}
+
+type Section struct {
+	Binaries []Command
+	Fuzz     Fuzz
+	Sign     *Sign
+	Timeout  int
+}
+
+tree, err := yaml.Decode(data)
+if err != nil {
+	return err
+}
+s := &Section{Fuzz: Fuzz{Time: "30s"}, Timeout: 15} // the baseline
+if err := cli.Decode(tree, "go", s); err != nil {
+	return err
+}
+```
+
+For this document `Decode` sets `Binaries` to the command `ergon` with the default `.` of `Main`,
+and `Fuzz.Args` to one argument. `Fuzz.Time` keeps `30s`, `Timeout` keeps 15, and `Sign` is still
+nil:
+
+```yaml
+go:
+  binaries:
+    - name: ergon
+      platforms: [linux/amd64, darwin/arm64]
+  fuzz:
+    args: [-fuzzminimizetime=2s]
+```
+
+`Decode` follows these rules:
+
+- A field without a member keeps its value, so the value can start at the baseline of the program.
+- An array replaces a list, and an object replaces a map. The object of a group sets the fields of
+  its members.
+- A list or a map of structs takes an array or an object of objects. A pointer to a struct takes an
+  object.
+- `Decode` creates each struct of a list or a map and the target of a nil pointer with the defaults
+  of their tags. It does not apply the defaults to the value that it decodes into.
+- `Decode` decodes into a copy of the target of a pointer. It changes the value only when it
+  returns nil.
+- A member with a null value leaves its field unchanged. An empty array or object empties a list or
+  a map.
+- The tags `arg`, `short`, `env`, `key` and `secret` fail with `ErrDeclaration`.
+
+An invalid document fails with a `*cli.Error`. The key of each member starts at the root of the
+tree:
+
+```text
+cli: unknown key go.binaries[0].nme (did you mean go.binaries[0].name?)
+cli: missing go.binaries[0].name
+cli: invalid go.timeout "soon": invalid syntax
+```
+
+`App.Main` writes a `*cli.Error` that a handler returns, also a wrapped one, and exits with the
+status 2.
 
 ## Sources
 
@@ -593,7 +673,7 @@ returns the exit status for `os.Exit`:
 |---|---|---|
 | 0 | `cli.ExitOK` | The handler succeeds, or the run writes the help or the version |
 | 1 | `cli.ExitFailure` | The handler fails or the declarations of the app are invalid |
-| 2 | `cli.ExitUsage` | The command line, an environment variable or the config file is invalid |
+| 2 | `cli.ExitUsage` | The command line, an environment variable or the config file is invalid, or the handler returns an error that wraps a `*cli.Error` |
 
 `App.Execute` returns the error instead. It returns a `*cli.Error` for an invalid command line,
 environment variable or config file. The error wraps one of the sentinels `ErrUnknownCommand`,
