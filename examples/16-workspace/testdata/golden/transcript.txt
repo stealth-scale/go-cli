@@ -1,12 +1,14 @@
 $ cat ws/.acme.json
-{"version": 1, "strict": false, "plans": {"api": {"enabled": false}, "web": {"enabled": true}}}
+{"version": 1, "strict": false, "plans": {"api": {"enabled": false}, "web": {"steps": [{"run": "make build"}, {"run": "make test"}]}}}
 $ acme --chdir ws/svc/store plans
 api: disabled
 web: enabled
+  make build
+  make test
 [exit 0]
 
 $ cat ws/.acme.json
-{"version": 1, "strict": false, "plans": {"api": {"enabled": false}, "web": {"enabled": true}}}
+{"version": 1, "strict": false, "plans": {"api": {"enabled": false}, "web": {"steps": [{"run": "make build"}, {"run": "make test"}]}}}
 $ acme --chdir ws/svc/store --flag-debug plans
   OPTION    VALUE            SOURCE
   --chdir   "ws/svc/store"   flag --chdir
@@ -14,6 +16,8 @@ $ acme --chdir ws/svc/store --flag-debug plans
   --strict  false            key strict of ws/.acme.json
 api: disabled
 web: enabled
+  make build
+  make test
 [exit 0]
 
 # The workspace file sets the option strict.
@@ -39,6 +43,13 @@ $ cat typo/.acme.json
 {"version": 1, "strickt": true}
 $ acme --chdir typo plans
 acme: plans: unknown key strickt in typo/.acme.json (did you mean strict?)
+[exit 2]
+
+# A misspelled member of a plan fails with a suggestion.
+$ cat plan-typo/.acme.json
+{"version": 1, "plans": {"api": {"enabeld": false}}}
+$ acme --chdir plan-typo plans
+acme: main: decode plan-typo/.acme.json: cli: unknown key plans.api.enabeld (did you mean plans.api.enabled?)
 [exit 2]
 
 # A path of the flag --config needs no search.

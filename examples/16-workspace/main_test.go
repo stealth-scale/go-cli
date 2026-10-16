@@ -13,11 +13,13 @@ import (
 
 // files are the workspaces of the runs. The file .git marks the top of a repository.
 var files = clitest.Files{
-	"ws/.acme.json":     `{"version": 1, "strict": false, "plans": {"api": {"enabled": false}, "web": {"enabled": true}}}`,
-	"strict/.acme.json": `{"version": 1, "strict": true, "plans": {"api": {"enabled": false}}}`,
-	"typo/.acme.json":   `{"version": 1, "strickt": true}`,
-	"repo/.git":         "",
-	".acme.json":        `{"version": 1, "plans": {"root": {"enabled": true}}}`,
+	"ws/.acme.json": `{"version": 1, "strict": false, "plans": {"api": {"enabled": false}, ` +
+		`"web": {"steps": [{"run": "make build"}, {"run": "make test"}]}}}`,
+	"strict/.acme.json":    `{"version": 1, "strict": true, "plans": {"api": {"enabled": false}}}`,
+	"typo/.acme.json":      `{"version": 1, "strickt": true}`,
+	"plan-typo/.acme.json": `{"version": 1, "plans": {"api": {"enabeld": false}}}`,
+	"repo/.git":            "",
+	".acme.json":           `{"version": 1, "plans": {"root": {"enabled": true}}}`,
 }
 
 // runs are the command lines of the transcript of the example.
@@ -32,6 +34,11 @@ var runs = []clitest.Input{
 		Files:   files,
 	},
 	{Args: []string{"--chdir", "typo", "plans"}, Files: files},
+	{
+		Comment: "A misspelled member of a plan fails with a suggestion.",
+		Args:    []string{"--chdir", "plan-typo", "plans"},
+		Files:   files,
+	},
 	{
 		Comment: "A path of the flag --config needs no search.",
 		Args:    []string{"-c", ".acme.json", "plans"},
