@@ -8,7 +8,7 @@ go 1.27.2
 require (
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/charmbracelet/colorprofile v0.4.3
-	go.dokimi.dev/assert v0.2.0
+	go.dokimi.dev/assert v0.3.1
 	go.stealthscale.io/cli v0.7.0
 	go.stealthscale.io/cli/charm v0.2.3
 	go.stealthscale.io/cli/toml v0.1.7
