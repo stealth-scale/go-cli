@@ -9,3 +9,4 @@ Each ADR records one decision and what it cost. Once an ADR is accepted, do not 
 
 | ADR | Title | Status |
 |---|---|---|
+| [0001](0001-decode-a-list-of-lists.md) | Decode takes a list of lists of values | Accepted |
