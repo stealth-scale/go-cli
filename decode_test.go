@@ -6,6 +6,7 @@ package cli_test
 import (
 	"encoding/json"
 	"errors"
+	"net"
 	"reflect"
 	"strconv"
 	"sync/atomic"
@@ -84,6 +85,7 @@ type (
 		Binaries []decodeBinary
 		Steps    []*decodeStep
 		Ports    []int
+		Batches  [][]int
 		Fuzz     decodeFuzz
 		Timeout  time.Duration
 		Jobs     int
@@ -165,6 +167,10 @@ type (
 	decodeRequired struct {
 		Binaries []decodeBinary `required:""`
 	}
+	// decodeRequiredLists has a required list of lists.
+	decodeRequiredLists struct {
+		Batches [][]int `required:""`
+	}
 )
 
 // The structs that decodeEmbedded embeds through exported pointers. Their names are exported, so
@@ -217,6 +223,7 @@ type (
 	declPointers struct{ Hooks []*string }
 	declDouble   struct{ Sign **decodeSign }
 	declNested   struct{ Paths map[string][]string }
+	declLists    struct{ Events [][]chan int }
 	declArray    struct{ Pair [2]int }
 	declAny      struct{ Value any }
 	declMapKey   struct{ Plans map[[2]int]decodePlan }
@@ -243,6 +250,9 @@ type (
 	}
 	declListPrefix struct {
 		Binaries []decodeBinary `prefix:"x"`
+	}
+	declListsDefault struct {
+		Batches [][]int `default:"1"`
 	}
 	declGroupTag struct {
 		Fuzz decodeFuzz `required:""`
@@ -282,9 +292,9 @@ func (f *decodeFlaky) UnmarshalText(b []byte) error {
 // decodeMembers generates the names of the members of the trees that decodeTrees generates: the
 // member go, the members of decodeSection and of its structs, and one other.
 var decodeMembers = prop.SampledFrom(
-	"go", "labels", "plans", "hooks", "sign", "retries", "binaries", "steps", "ports", "fuzz", "timeout",
-	"jobs", "verbose", "name", "main", "platforms", "build", "tags", "trimpath", "args", "time", "key",
-	"mode", "env", "run", "cache", "weight", "enabled", "other",
+	"go", "labels", "plans", "hooks", "sign", "retries", "binaries", "steps", "ports", "batches", "fuzz",
+	"timeout", "jobs", "verbose", "name", "main", "platforms", "build", "tags", "trimpath", "args", "time",
+	"key", "mode", "env", "run", "cache", "weight", "enabled", "other",
 )
 
 // decodeTrees generates the trees of a JSON document: objects of the names of decodeMembers,
@@ -499,6 +509,11 @@ func TestDecode(t *testing.T) {
 				want: decodeSection{Ports: []int{}},
 			},
 			{
+				name: "replaces a list of lists with the arrays of an array",
+				give: map[string]any{"batches": []any{[]any{json.Number("1"), "2"}, []any{}}},
+				want: decodeSection{Batches: [][]int{{1, 2}, {}}},
+			},
+			{
 				name: "replaces a map with the entries of an object",
 				give: map[string]any{"labels": map[string]any{"team": "core"}},
 				want: decodeSection{Labels: map[string]string{"team": "core"}},
@@ -663,27 +678,40 @@ func TestDecode(t *testing.T) {
 		t.Run("decodes the member of a key into a value of any type that a field can have", func(t *testing.T) {
 			t.Parallel()
 			tree := map[string]any{
-				"jobs":  "4",
-				"sign":  map[string]any{"key": "k"},
-				"plans": map[string]any{"api": map[string]any{}},
-				"zone":  "UTC",
-				"at":    "2026-10-16T12:00:00Z",
+				"jobs":    "4",
+				"sign":    map[string]any{"key": "k"},
+				"plans":   map[string]any{"api": map[string]any{}},
+				"zone":    "UTC",
+				"at":      "2026-10-16T12:00:00Z",
+				"batches": []any{[]any{"1", "2"}},
 			}
 			var jobs int
 			var sign *decodeSign
 			var plans map[string]decodePlan
 			var zone *time.Location
 			var at *time.Time
+			var batches [][]int
 			assert.NoError(t, cli.Decode(tree, "jobs", &jobs), "Decode decodes a value")
 			assert.NoError(t, cli.Decode(tree, "sign", &sign), "Decode decodes a pointer to a struct")
 			assert.NoError(t, cli.Decode(tree, "plans", &plans), "Decode decodes a map of structs")
 			assert.NoError(t, cli.Decode(tree, "zone", &zone), "Decode decodes a pointer with a conversion")
 			assert.NoError(t, cli.Decode(tree, "at", &at), "Decode decodes a pointer to a struct with a conversion")
+			assert.NoError(t, cli.Decode(tree, "batches", &batches), "Decode decodes a list of lists")
 			expect.Equal(t, jobs, 4, "Decode converts the value")
 			expect.Equal(t, sign, &decodeSign{Key: "k", Mode: "cosign"}, "Decode creates the target")
 			expect.Equal(t, plans, map[string]decodePlan{"api": {Enabled: true}}, "Decode creates the plan")
 			expect.Equal(t, zone, time.UTC, "Decode loads the location")
 			expect.Equal(t, *at, time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC), "Decode parses the time")
+			expect.Equal(t, batches, [][]int{{1, 2}}, "Decode converts the values of each list")
+		})
+
+		t.Run("decodes a list of a slice type with a conversion as a list of values", func(t *testing.T) {
+			t.Parallel()
+			var got []net.IP
+			tree := map[string]any{"hosts": []any{"10.0.0.1", "::1"}}
+			assert.NoError(t, cli.Decode(tree, "hosts", &got), "Decode decodes the member")
+			assert.Equal(t, got, []net.IP{net.ParseIP("10.0.0.1"), net.ParseIP("::1")},
+				"Decode converts each value with the UnmarshalText of net.IP")
 		})
 
 		invalid := []struct {
@@ -745,6 +773,31 @@ func TestDecode(t *testing.T) {
 				name: "returns ErrInvalidValue for a nil element of an array of values",
 				give: map[string]any{"ports": []any{nil}},
 				want: `cli: invalid go.ports[0]: want a value`,
+			},
+			{
+				name: "returns ErrInvalidValue for a value for a list of lists",
+				give: map[string]any{"batches": "1"},
+				want: `cli: invalid go.batches "1": want an array`,
+			},
+			{
+				name: "returns ErrInvalidValue for a text in an array of lists",
+				give: map[string]any{"batches": []any{"1,2"}},
+				want: `cli: invalid go.batches[0] "1,2": want an array`,
+			},
+			{
+				name: "returns ErrInvalidValue for a nil element of an array of lists",
+				give: map[string]any{"batches": []any{nil}},
+				want: `cli: invalid go.batches[0]: want an array`,
+			},
+			{
+				name: "returns ErrInvalidValue for a value of an inner array that does not convert",
+				give: map[string]any{"batches": []any{[]any{"1"}, []any{"2", "x"}}},
+				want: `cli: invalid go.batches[1][1] "x": invalid syntax`,
+			},
+			{
+				name: "returns ErrInvalidValue for an array in an inner array",
+				give: map[string]any{"batches": []any{[]any{[]any{}}}},
+				want: `cli: invalid go.batches[0][0]: want a value`,
 			},
 			{
 				name: "returns ErrInvalidValue for an array for a map of values",
@@ -919,6 +972,14 @@ func TestDecode(t *testing.T) {
 			assert.Equal(t, err.Error(), "cli: missing binaries", "the error states the key of the member")
 		})
 
+		t.Run("returns ErrMissing for a tree without the member of a required list of lists", func(t *testing.T) {
+			t.Parallel()
+			var got decodeRequiredLists
+			err := cli.Decode(map[string]any{}, "", &got)
+			assert.ErrorIs(t, err, cli.ErrMissing, "Decode returns ErrMissing")
+			assert.Equal(t, err.Error(), "cli: missing batches", "the error states the key of the member")
+		})
+
 		t.Run("returns the same error on every call for a tree of several faults", func(t *testing.T) {
 			t.Parallel()
 			tree := map[string]any{"verbose": "maybe", "jobs": "x", "binaries": "y", "fuzz": "z", "other": "w"}
@@ -989,6 +1050,18 @@ func TestDecode(t *testing.T) {
 					"which has no conversion",
 			},
 			{
+				name: "returns ErrDeclaration for a list of lists without a conversion",
+				give: func() error { return cli.Decode(map[string]any{}, "", new(declLists)) },
+				want: "cli: invalid declaration: each list of the field cli_test.declLists.Events has the type " +
+					"[]chan int, which has no conversion",
+			},
+			{
+				name: "returns ErrDeclaration for a value of a list of lists without a conversion",
+				give: func() error { return cli.Decode(map[string]any{}, "", new([][]chan int)) },
+				want: "cli: invalid declaration: each list of the value of Decode has the type []chan int, " +
+					"which has no conversion",
+			},
+			{
 				name: "returns ErrDeclaration for an array",
 				give: func() error { return cli.Decode(map[string]any{}, "", new(declArray)) },
 				want: "cli: invalid declaration: the field cli_test.declArray.Pair has the type [2]int, " +
@@ -1046,6 +1119,12 @@ func TestDecode(t *testing.T) {
 				name: "returns ErrDeclaration for the tag prefix of a list of structs",
 				give: func() error { return cli.Decode(map[string]any{}, "", new(declListPrefix)) },
 				want: "cli: invalid declaration: the field cli_test.declListPrefix.Binaries takes no tag prefix " +
+					"in a document",
+			},
+			{
+				name: "returns ErrDeclaration for the tag default of a list of lists",
+				give: func() error { return cli.Decode(map[string]any{}, "", new(declListsDefault)) },
+				want: "cli: invalid declaration: the field cli_test.declListsDefault.Batches takes no tag default " +
 					"in a document",
 			},
 			{
@@ -1233,6 +1312,18 @@ func drawSection(c *prop.Case, base decodeSection) (map[string]any, decodeSectio
 			items[i] = json.Number(strconv.Itoa(port))
 		}
 		tree["ports"], want.Ports = items, ports
+	}
+	if c.Draw(prop.Boolean(), "batches present") {
+		batches := c.Draw(prop.List(prop.List(prop.Integer(-9, 9), prop.MaxSize(3)), prop.MaxSize(3)), "batches")
+		items := make([]any, len(batches))
+		for i, batch := range batches {
+			values := make([]any, len(batch))
+			for j, n := range batch {
+				values[j] = json.Number(strconv.Itoa(n))
+			}
+			items[i] = values
+		}
+		tree["batches"], want.Batches = items, batches
 	}
 	if c.Draw(prop.Boolean(), "labels present") {
 		labels := c.Draw(prop.Dict(prop.StringMatching(`[a-z]{1,4}`), prop.StringMatching(`[a-z0-9]{0,4}`),

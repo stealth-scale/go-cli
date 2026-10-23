@@ -26,8 +26,8 @@ const treeLabel = "tree"
 var (
 	// valueRejected are the tags that a value of a document does not take.
 	valueRejected = [...]tag{tagArg, tagShort, tagEnv, tagKey, tagSecret}
-	// listRejected are the tags that a list or a map of structs does not take. They are the tags of
-	// valueRejected, default, enum and prefix.
+	// listRejected are the tags that a list or a map of structs and a list of lists do not take. They
+	// are the tags of valueRejected, default, enum and prefix.
 	listRejected = [...]tag{tagDefault, tagEnum, tagArg, tagShort, tagEnv, tagKey, tagSecret, tagPrefix}
 )
 
@@ -47,6 +47,8 @@ const (
 	listForm form = 3
 	// mapForm is a map of structs or of pointers to structs. Its member is an object of objects.
 	mapForm form = 4
+	// listsForm is a list of lists of values. Its member is an array of arrays of values.
+	listsForm form = 5
 )
 
 // part is the decoding of the type of a field, or of the type of the value of [Decode].
@@ -54,6 +56,7 @@ type part struct {
 	typ  reflect.Type
 	opt  *option    // the option that converts a value of valueForm
 	st   *docStruct // the struct, the target of a pointer, or the struct of an element
+	elem *part      // the part of each list of listsForm, which has valueForm
 	key  converter  // the conversion of the keys of mapForm
 	form form
 	ptr  bool // the elements of listForm and mapForm are pointers to the struct
@@ -65,6 +68,7 @@ type part struct {
 // Error modes:
 //   - an *Error that wraps ErrInvalidValue for a member of another kind than p takes, and for a
 //     key of an entry of mapForm that does not convert.
+//   - an *Error that wraps ErrInvalidValue for an element of listsForm that is not an array.
 //   - the errors of value, of element, of docStruct.decode and of docStruct.replace.
 func (p *part) decode(key string, member any, v reflect.Value) error {
 	switch p.form {
@@ -114,6 +118,25 @@ func (p *part) decode(key string, member any, v reflect.Value) error {
 			entries.SetMapIndex(k, e)
 		}
 		v.Set(entries)
+	case listsForm:
+		items, ok := member.([]any)
+		if !ok {
+			return invalid(key, member, wantArray)
+		}
+		lists := reflect.MakeSlice(p.typ, len(items), len(items))
+		for i, item := range items {
+			k := key + "[" + strconv.Itoa(i) + "]"
+			values, ok := item.([]any)
+			if !ok {
+				return invalid(k, item, wantArray)
+			}
+			list, err := p.elem.value(k, values)
+			if err != nil {
+				return err
+			}
+			lists.Index(i).Set(list)
+		}
+		v.Set(lists)
 	default:
 		value, err := p.value(key, member)
 		if err != nil {
@@ -372,7 +395,7 @@ type document struct {
 // for the value of Decode.
 //
 // Error modes:
-//   - the errors of structOf, of listOf and of valueOf.
+//   - the errors of structOf, of listOf, of listsOf and of valueOf.
 func (d *document) partOf(t reflect.Type, f *reflect.StructField, s *scope) (*part, error) {
 	switch target := d.conv.target(t); {
 	case target != nil:
@@ -388,6 +411,8 @@ func (d *document) partOf(t reflect.Type, f *reflect.StructField, s *scope) (*pa
 	case t.Kind() == reflect.Slice && d.conv.target(t.Elem()) != nil,
 		t.Kind() == reflect.Map && d.conv.converter(t.Key()) != nil && d.conv.target(t.Elem()) != nil:
 		return d.listOf(t, f, s)
+	case t.Kind() == reflect.Slice && t.Elem().Kind() == reflect.Slice && d.conv.converter(t.Elem()) == nil:
+		return d.listsOf(t, f, s)
 	default:
 		return d.valueOf(t, f, s)
 	}
@@ -414,6 +439,29 @@ func (d *document) listOf(t reflect.Type, f *reflect.StructField, s *scope) (*pa
 		p.form, p.key = mapForm, d.conv.converter(t.Key())
 	}
 	return p, nil
+}
+
+// listsOf returns the part of t. t is a list whose elements are lists without a conversion of their
+// own. f is the field of t in the struct of the scope s, or nil for the value of Decode. The part of
+// each list of t has valueForm, as the part of a list of values does.
+//
+// Error modes:
+//   - an error that wraps ErrDeclaration for a tag of listRejected on f, and for lists whose values
+//     have no conversion, such as the lists of [][]chan int.
+func (d *document) listsOf(t reflect.Type, f *reflect.StructField, s *scope) (*part, error) {
+	owner := "the value of Decode"
+	if f != nil {
+		field := s.path + "." + f.Name
+		if err := rejectTags(f, field, listRejected[:]); err != nil {
+			return nil, err
+		}
+		owner = "the field " + field
+	}
+	o := &option{value: reflect.New(t.Elem()).Elem()}
+	if reason := d.conv.setShape(o, t.Elem()); reason != "" {
+		return nil, fmt.Errorf("%w: each list of %s %s", ErrDeclaration, owner, reason)
+	}
+	return &part{typ: t, elem: &part{typ: t.Elem(), opt: o, form: valueForm}, form: listsForm}, nil
 }
 
 // valueOf returns the part of t. t is a value, a list or a map of values, or a pointer to a value. f
@@ -577,11 +625,13 @@ func (d *document) flatten(st *docStruct, t reflect.Type, steps []step, s *scope
 // structs is an object, also when the list or the map contains pointers to structs. Decode creates
 // the struct of each with its zero value and the defaults of its tags. A pointer to a struct takes
 // an object. Decode creates the target of a nil pointer in the same way, and decodes into a copy of
-// the target of any other pointer. Any other value converts from its text by the rules of options.
-// The conversions of [App.Convert] do not apply.
+// the target of any other pointer. Each element of a list of lists, such as [][]string, is an array
+// of values. Any other value converts from its text by the rules of options. The conversions of
+// [App.Convert] do not apply.
 //
 // Decode reads the tags name, prefix, default, enum and required of a field. It applies default to
-// each struct that it creates and not to the value that v points to.
+// each struct that it creates and not to the value that v points to. A list or a map of structs and
+// a list of lists do not take the tags default, enum and prefix.
 //
 // Decode changes the value only when it returns nil. It does not write into a list, a map or the
 // target of a pointer that the value contains. It does not modify tree or keep a map, a slice or a
@@ -590,12 +640,12 @@ func (d *document) flatten(st *docStruct, t reflect.Type, steps []step, s *scope
 // Error modes:
 //   - an error that wraps [ErrDeclaration] when v is not a non-nil pointer, and for a key with an
 //     empty name.
-//   - an error that wraps [ErrDeclaration] for a type that Decode cannot decode into, and for a field
-//     with the tag arg, short, env, key or secret.
+//   - an error that wraps [ErrDeclaration] for a type that Decode cannot decode into, and for a tag
+//     that a field does not take, such as the tag arg, short, env, key or secret.
 //   - an [*Error] that wraps [ErrUnknownKey] for a member without a field.
 //   - an [*Error] that wraps [ErrInvalidValue] for a value that does not convert, a value outside
-//     the enum of its field, a nil element of an array or of an object, and a member whose kind
-//     the field does not take, such as an array for a field of one value.
+//     the enum of its field, a nil element of an array or of an object, and a member or an element
+//     whose kind the field does not take, such as an array for a field of one value.
 //   - an [*Error] that wraps [ErrMissing] for an object without the member of a required field.
 func Decode(tree map[string]any, key string, v any) error {
 	ptr := reflect.ValueOf(v)

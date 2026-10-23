@@ -519,6 +519,8 @@ go:
 - A field without a member keeps its value, so the value can start at the baseline of the program.
 - An array replaces a list, and an object replaces a map. The object of a group sets the fields of
   its members.
+- A list of lists, such as `[][]string`, takes an array of arrays of values. The YAML
+  `[[go, generate], [go, vet]]` is a list of two command lines.
 - A list or a map of structs takes an array or an object of objects. A pointer to a struct takes an
   object.
 - `Decode` creates each struct of a list or a map and the target of a nil pointer with the defaults
@@ -527,7 +529,8 @@ go:
   returns nil.
 - A member with a null value leaves its field unchanged. An empty array or object empties a list or
   a map.
-- The tags `arg`, `short`, `env`, `key` and `secret` fail with `ErrDeclaration`.
+- The tags `arg`, `short`, `env`, `key` and `secret` fail with `ErrDeclaration`. The tags
+  `default`, `enum` and `prefix` also fail on a list of lists and on a list or a map of structs.
 
 An invalid document fails with a `*cli.Error`. The key of each member starts at the root of the
 tree:

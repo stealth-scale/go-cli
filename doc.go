@@ -122,10 +122,11 @@
 // exported embedded pointer to a struct add their fields to the object of their parent.
 //
 // A field without a member keeps its value, so the value can start at the baseline of the program.
-// An array replaces a list, and an object replaces a map. A list or a map of structs takes an array
-// or an object of objects, and a pointer to a struct takes an object. Decode creates each struct of
-// a list or a map and the target of a nil pointer with the defaults of their tags. A member without
-// a field fails with [ErrUnknownKey], and Decode changes the value only when it returns nil.
+// An array replaces a list, and an object replaces a map. A list of lists, such as [][]string,
+// takes an array of arrays of values. A list or a map of structs takes an array or an object of
+// objects, and a pointer to a struct takes an object. Decode creates each struct of a list or a
+// map and the target of a nil pointer with the defaults of their tags. A member without a field
+// fails with [ErrUnknownKey], and Decode changes the value only when it returns nil.
 //
 // # Input files
 //
