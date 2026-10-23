@@ -1,5 +1,11 @@
 # go.stealthscale.io/cli
 
+## 0.7.0
+
+### Minor Changes
+
+- b8b866b: Decode an array of arrays into a list of lists of values, such as `[][]string`, with `cli.Decode`.
+
 ## 0.6.0
 
 ### Minor Changes
