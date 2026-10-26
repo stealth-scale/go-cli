@@ -6,7 +6,7 @@ module go.stealthscale.io/cli/yaml
 go 1.27.2
 
 require (
-	go.dokimi.dev/assert v0.3.1
+	go.dokimi.dev/assert v0.6.0
 	go.stealthscale.io/cli v0.7.0
 	go.yaml.in/yaml/v3 v3.0.5
 )

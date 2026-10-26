@@ -5,4 +5,4 @@ module go.stealthscale.io/cli
 
 go 1.27.2
 
-require go.dokimi.dev/assert v0.3.1
+require go.dokimi.dev/assert v0.6.0
