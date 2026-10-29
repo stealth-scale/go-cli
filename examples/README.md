@@ -28,6 +28,7 @@ repository describes the features that the examples show. The module
 | [`15-renderer`](15-renderer) | a renderer for each run through `App.RenderFor`: the option `--format` selects `cli.Plain` or a renderer of its own that writes the help, the version, the failures and the rows of `--flag-debug` as JSON, a version of `App.Version` from variables of the linker, and exit statuses of its own through `App.ExecuteRenderer` and `App.Failure` |
 | [`16-workspace`](16-workspace) | a workspace file that `App.LocateConfig` finds from `--chdir` upward, with plans that `App.IgnoreKeys` leaves to the handler and `cli.Decode` decodes |
 | [`17-completion`](17-completion) | the command `completion` and the candidates of a command line, a function of `App.Complete` that reads the plans of the config file, and a test that runs the script of bash, zsh, fish and PowerShell in its shell |
+| [`18-environment`](18-environment) | environment variables that start with a prefix of `App.EnvPrefix` in place of the name of the app, and an option whose tag `env` replaces its whole variable |
 
 Each example imports the module `go.stealthscale.io/cli`. The examples `09-yaml`, `10-toml` and
 `13-charm` also import the module of their name.

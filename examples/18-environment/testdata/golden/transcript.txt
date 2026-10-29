@@ -1,0 +1,50 @@
+# The help lists the variable of each option.
+$ storectl serve --help
+Usage: storectl serve [options]
+
+Run the server of the store.
+
+Options:
+      --database-url string  URL of the database.  env DATABASE_URL, key serve.database-url
+  -p, --port int             Port to listen on.    default "8080", env STORE_SERVE_PORT, key serve.port
+      --workers int          Number of workers.    default "4", env STORE_SERVE_WORKERS, key serve.workers
+
+Global options:
+  -c, --config file  Config file in JSON.                                                    env STORE_CONFIG
+      --flag-debug   Print the value and the source of each option before the command runs.  env STORE_FLAG_DEBUG
+  -h, --help         Show the help.
+[exit 0]
+
+# STORE_SERVE_PORT sets the option Port.
+$ STORE_SERVE_PORT=9000 storectl serve
+serve on port 9000 with 4 workers, database URL unset
+[exit 0]
+
+# The program does not read a variable that starts with its name.
+$ STORECTL_SERVE_PORT=9000 storectl serve
+serve on port 8080 with 4 workers, database URL unset
+[exit 0]
+
+# The tag env of DatabaseURL replaces the prefix with the whole variable DATABASE_URL.
+$ DATABASE_URL=postgres://store@db/store STORE_SERVE_WORKERS=8 storectl serve --flag-debug
+  OPTION          VALUE  SOURCE
+  --config        ""     default
+  --database-url  ***    env DATABASE_URL
+  --port          8080   default
+  --workers       8      env STORE_SERVE_WORKERS
+serve on port 8080 with 8 workers, database URL set
+[exit 0]
+
+# STORE_FLAG_DEBUG turns on the flag --flag-debug.
+$ STORE_FLAG_DEBUG=true storectl serve -p 9001
+  OPTION          VALUE  SOURCE
+  --config        ""     default
+  --database-url  ***    default
+  --port          9001   flag --port
+  --workers       4      default
+serve on port 9001 with 4 workers, database URL unset
+[exit 0]
+
+$ storectl serve >/dev/full
+storectl: main: write the options: clitest: no space left on device
+[exit 1]
