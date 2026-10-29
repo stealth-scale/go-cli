@@ -5,6 +5,14 @@
 
 # go-cli
 
+[![Go Reference](https://pkg.go.dev/badge/go.stealthscale.io/cli.svg)](https://pkg.go.dev/go.stealthscale.io/cli)
+[![CI](https://github.com/stealth-scale/go-cli/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/stealth-scale/go-cli/actions/workflows/ci.yml)
+[![Security](https://github.com/stealth-scale/go-cli/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/stealth-scale/go-cli/actions/workflows/security.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/stealth-scale/go-cli/badge)](https://scorecard.dev/viewer/?uri=github.com/stealth-scale/go-cli)
+[![Release](https://img.shields.io/github/v/tag/stealth-scale/go-cli?filter=v*&sort=semver&label=release)](CHANGELOG.md)
+[![Go](https://img.shields.io/github/go-mod/go-version/stealth-scale/go-cli)](go.mod)
+[![License](https://img.shields.io/github/license/stealth-scale/go-cli)](LICENSE)
+
 `go.stealthscale.io/cli` runs command-line programs whose options are the fields of Go structs. The
 package derives the flag, the environment variable and the config key of each field. It converts
 every source to the type of the field and applies the sources in one order. A handler receives its
@@ -75,21 +83,45 @@ $ srv serve --adr :9000
 srv: serve: unknown flag --adr (did you mean --addr?)
 ```
 
+## Features
+
+- [Commands](#commands) nest. A command shares its options and its hooks with its subcommands.
+- A command takes [positional arguments](#positional-arguments) and reads
+  [input files](#input-files) or the standard input.
+- A nested struct forms a [group](#groups) of options.
+- A run converts the text of every source to the [type](#types) of its field. A program adds the
+  conversions of its own types.
+- A [config file](#config-files) can be JSON, INI, YAML, TOML or a format of the program. A key
+  without an option fails the run.
+- [`cli.Decode`](#documents) decodes a document of the program by the rules of the options.
+- A run records the [source](#sources) of every value, and `--flag-debug` prints the sources.
+- An app can declare its [version](#version). It [completes](#completion) its command lines in
+  bash, zsh, fish and PowerShell.
+- A [renderer](#output) writes the help, the version and the failures. The module `charm` renders
+  them with Lip Gloss.
+- The package [`clitest`](#testing) runs a program in a test without the arguments, the
+  environment and the files of the process.
+
+[Research-0001](docs/research/0001-does-a-stdlib-declarative-cli-exist.md) compares go-cli with
+kong, cobra and viper, urfave/cli, ff and other Go libraries.
+
 ## Install
 
 ```sh
 go get go.stealthscale.io/cli
 ```
 
-Every module of go-cli requires Go 1.27.2 or later. The package `cli` imports only the standard
-library. The YAML and TOML formats of config files and the Lip Gloss renderer are modules of their
-own:
+Every module of go-cli requires Go 1.27.2 or later. CI tests each module on Linux, macOS and
+Windows. The package `cli` imports only the standard library. The YAML and TOML formats of config
+files and the Lip Gloss renderer are modules of their own:
 
 ```sh
 go get go.stealthscale.io/cli/yaml
 go get go.stealthscale.io/cli/toml
 go get go.stealthscale.io/cli/charm
 ```
+
+pkg.go.dev contains the [API reference](https://pkg.go.dev/go.stealthscale.io/cli).
 
 ## Options
 
@@ -207,6 +239,11 @@ func signIn(ctx context.Context, run *cli.Run[Global, Registry], next func(conte
 
 `App.Use` adds a hook that every run calls. `App.Handle` sets the handler of the app, so a program
 such as `wc` runs without a command.
+
+`Run.Global` returns the global options of a run, and `Run.Config` returns the options of the
+command of the handler or the hook. Both contain the values of every source. `Run.Command` returns
+the path of the command, such as `registry push`, or the empty string in a run of the handler of
+the app.
 
 A handler reads the standard input of its run through `Run.Stdin`, so a pipe passes data to a
 command. The program `wc` of the example [`14-testing`](examples/14-testing) counts the words of
@@ -426,6 +463,23 @@ yaml.Register(a)           // YAML for .yaml and .yml
 a.Format(cli.INI, ".conf") // INI for .conf
 ```
 
+Each format reads a file by its own rules:
+
+- `cli.JSON` reads one object and keeps the text of each number, so a large integer keeps every
+  digit.
+- `cli.INI` nests the keys of a section `[serve]` under `serve`, and the keys of `[serve.tls]` under
+  `serve` and `tls`. A list is a value whose items commas separate. A value in double quotes is
+  unquoted by the rules of Go, and a line that starts with `;` or `#` is a comment.
+- `yaml.Decode` reads the first document of a file and applies anchors, aliases and merge keys. It
+  returns each scalar as its text, so `0644` is the file mode 0644 and `1.10` is the string `1.10`.
+- `toml.Decode` returns a date and a time as a `time.Time`. An option converts the `time.Time`
+  through its text.
+
+A format of the program is a function of the type `cli.Format`. It decodes the data of a file into
+a tree. An object of the tree is a `map[string]any`, and an array is a `[]any`. Every other value
+converts through `MarshalText` when it implements `encoding.TextMarshaler`, and through
+`fmt.Sprint` otherwise. A member with a nil value does not set an option.
+
 A run skips a missing file at the default path, so the program also runs without a config file. A
 missing file at a path from the environment or the command line fails the run. `srv -c '' serve`
 does not read a file because its path is empty. A key that does not match an option also fails the
@@ -577,6 +631,14 @@ listen on :9000 with a timeout of 5s for ["https://admin.example.com"]
 src, _ := run.Source(&run.Config().Timeout) // env SRV_SERVE_TIMEOUT
 ```
 
+A `cli.Source` has a `Kind`: `Default`, `File`, `Environment` or `Flag` for the four sources of the
+list, `Argument` for a positional argument, and `Located` for a path that `App.LocateConfig`
+returns. `Name` contains the config key, the environment variable, the flag or the argument, and
+`File` contains the path of the config file.
+
+`Source.String` returns the text of the column `SOURCE` of `--flag-debug`. `Run.Source` reports
+false for a pointer that is not the field of an option of the run.
+
 ## Version
 
 `App.Version` registers the version of an app and declares the global flag `--version`. The program
@@ -675,19 +737,21 @@ returns the exit status for `os.Exit`:
 | Status | Constant | Cause |
 |---|---|---|
 | 0 | `cli.ExitOK` | The handler succeeds, or the run writes the help or the version |
-| 1 | `cli.ExitFailure` | The handler fails or the declarations of the app are invalid |
+| 1 | `cli.ExitFailure` | The handler fails, the declarations of the app are invalid, the `Env` is incomplete, or the help, the version or the table of `--flag-debug` fails to write |
 | 2 | `cli.ExitUsage` | The command line, an environment variable or the config file is invalid, or the handler returns an error that wraps a `*cli.Error` |
 
 `App.Execute` returns the error instead. It returns a `*cli.Error` for an invalid command line,
 environment variable or config file. The error wraps one of the sentinels `ErrUnknownCommand`,
 `ErrUnknownFlag`, `ErrUnknownKey`, `ErrMissing`, `ErrInvalidValue`, `ErrUnexpectedArgument` and
 `ErrConfigFile`. Its fields `Command`, `Input`, `Value` and `Source` contain the location of the
-fault. `Error.Message` returns the text that `App.Main` writes after the name of the app. The
-example [`examples/12-errors`](examples/12-errors) handles these errors in place of `App.Main`.
+fault, and `Suggestion` contains the name that the package suggests in place of `Input`.
+`Error.Message` returns the text that `App.Main` writes after the name of the app. The example
+[`examples/12-errors`](examples/12-errors) handles these errors in place of `App.Main`.
 
 `App.Execute` checks the options of every command before it reads the command line. A wrong tag of
 one command fails a run of any command with an error that wraps `ErrDeclaration`, so the first test
-of the app finds it.
+of the app finds it. A run fails with an error that wraps `ErrEnv` when its `Env` is nil or lacks
+`Stdout` or `Stderr`.
 
 ## Output
 
@@ -751,10 +815,27 @@ t.Flag = t.Flag.Foreground(lipgloss.Green)
 a.Render(charm.New(&t))
 ```
 
+`charm.Theme` has one `lipgloss.Style` for each part of the output: `Heading`, `Program`,
+`Command`, `Argument`, `Flag`, `Text`, `Note`, `Required`, `ErrorBadge`, `ErrorText`, `Suggestion`
+and `Hint`. `DefaultTheme` takes its colors from the 16-color palette of the terminal, so the
+terminal decides each shade on a light and on a dark background.
+
 A renderer of your own implements the four methods of `cli.Renderer`. It can embed `cli.Plain` to
-replace only some of them. `App.RenderFor` registers a function that selects the renderer of each
-run from its global options, so an option such as `--format json` selects the output of the help,
-the version, the failures and `--flag-debug`:
+replace only some of them. Each method receives the writer, the environment of the run and one
+value:
+
+| Method | Writes | Value |
+|---|---|---|
+| `Help` | The help of the app or of a command | A `cli.Help` with the usage line, the text, the commands as `HelpCommand` values, and the arguments, the options and the global options as `HelpOption` values |
+| `Version` | The version | A `cli.Version` with the name of the app and the text of `App.Version` |
+| `Error` | The failure of a run | A `cli.Failure` with the error, the command, the message, the suggestion and whether the error is a usage error |
+| `Debug` | The table of `--flag-debug` | A `cli.DebugRow` for each option, with its value and its `Source` |
+
+Concurrent runs of one app share its renderer, so a renderer must be safe for concurrent use.
+
+`App.RenderFor` registers a function that selects the renderer of each run from its global options,
+so an option such as `--format json` selects the output of the help, the version, the failures and
+`--flag-debug`:
 
 ```go
 a.RenderFor(func(g *Global) cli.Renderer {
@@ -809,8 +890,10 @@ func TestServe(t *testing.T) {
 
 A run reads only the arguments, the environment variables, the files and the standard input of its
 `Input`. A config file or an input file outside `Input.Files` does not exist for the run, so the
-result does not depend on the files of the machine. `os.DirFS("testdata")` gives a run the files of
-a directory. Tests that call `clitest` can run in parallel.
+result does not depend on the files of the machine. `clitest.Files` maps each path to the text of
+its file, and `os.DirFS("testdata")` gives a run the files of a directory. A run opens
+`/etc/srv.json` as the file `etc/srv.json` of `Input.Files`. Tests that call `clitest` can run in
+parallel.
 
 `clitest.Transcript` runs a list of command lines and returns the runs as a terminal shows them,
 with the files that each run opened. A test compares the transcript with a golden file, such as
@@ -832,13 +915,20 @@ env, out := clitest.NewEnv(&clitest.Input{Stdin: "one two\n"})
 run, err := cli.NewRun(&Global{}, &Serve{Addr: ":9000"}, env)
 ```
 
-`FailStdin` and `FailStdout` make every read of the standard input or every write to the standard
-output fail, so a test can check the error paths of a handler. The examples test themselves with
-`clitest`.
+`out.Stdout()` and `out.Stderr()` return the text that the runs of the `Env` wrote.
 
-An `Env` of your own builds `Lookup` and `Environ` from one map with `cli.Vars` and `cli.Environ`.
-Its `Open` has the signature of `fs.FS.Open`, so the `Open` method of a file system such as
-`fstest.MapFS` gives a run its files.
+`FailStdin` makes every read of the standard input fail with `clitest.ErrStdin`, and `FailStdout`
+makes every write to the standard output fail with `clitest.ErrStdout`. A test checks the error
+paths of a handler this way. The examples test themselves with `clitest`.
+
+A run reads the arguments, the environment variables, the files and the standard streams of its
+process through a `cli.Env`. `cli.OS` returns the `Env` of the process, and a test builds one of its
+own. Only `Stdout` and `Stderr` are required. Without `Lookup` a run does not read an environment
+variable. Without `Open` each open fails as if the file did not exist, and without `Stdin` the
+standard input is empty.
+
+`cli.Vars` and `cli.Environ` build `Lookup` and `Environ` from one map. `Open` has the signature of
+`fs.FS.Open`, so the `Open` method of a file system such as `fstest.MapFS` gives a run its files.
 `App.Execute` and `App.Main` are safe for concurrent use once the registrations have returned, so
 parallel tests can share one app.
 
@@ -846,20 +936,40 @@ parallel tests can share one app.
 
 | Module | Contents | Imports outside the standard library |
 |---|---|---|
-| `go.stealthscale.io/cli` | The package `cli` with the formats JSON and INI | None |
-| `go.stealthscale.io/cli/yaml` | The YAML format | `go.yaml.in/yaml/v3` |
-| `go.stealthscale.io/cli/toml` | The TOML format | `github.com/BurntSushi/toml` |
-| `go.stealthscale.io/cli/charm` | The renderer of the output with Lip Gloss | `charm.land/lipgloss/v2`, `github.com/charmbracelet/colorprofile` |
+| `go.stealthscale.io/cli` | The package `cli` with the formats JSON and INI, and the package `clitest` | None |
+| [`go.stealthscale.io/cli/yaml`](yaml/README.md) | The YAML format | `go.yaml.in/yaml/v3` |
+| [`go.stealthscale.io/cli/toml`](toml/README.md) | The TOML format | `github.com/BurntSushi/toml` |
+| [`go.stealthscale.io/cli/charm`](charm/README.md) | The renderer of the output with Lip Gloss | `charm.land/lipgloss/v2`, `github.com/charmbracelet/colorprofile` |
+
+## Versioning
+
+Each module has its own version, its own tags and its own changelog: [CHANGELOG.md](CHANGELOG.md),
+[charm/CHANGELOG.md](charm/CHANGELOG.md), [toml/CHANGELOG.md](toml/CHANGELOG.md) and
+[yaml/CHANGELOG.md](yaml/CHANGELOG.md). The modules follow semantic versioning. Before v1.0.0 a
+minor release can contain a breaking change, and the changelog marks each breaking change with
+**Breaking:**.
 
 ## Examples
 
-[`examples/`](examples) contains 16 runnable programs. The test of each example compares its output
+[`examples/`](examples) contains 17 runnable programs. The test of each example compares its output
 with a golden transcript. [examples/README.md](examples/README.md) lists what each example shows.
 
 ## Development
 
-`make check` runs the formatters, the linters and the tests of every module. CI runs the same
-targets on every pull request. [CONTRIBUTING.md](CONTRIBUTING.md) describes how to propose a change.
+`make check` runs the gate of the repository:
+
+- rumdl lints the Markdown files, and actionlint lints the workflows.
+- golangci-lint lints every module and checks its format.
+- `go test` runs the tests of every module without and with the race detector.
+- govulncheck reports each known vulnerability that the code of a module calls.
+
+CI runs the same targets on every pull request and every push to `main`. It runs the Go targets on
+Linux, macOS and Windows. A nightly workflow fuzzes each fuzz target for 30 seconds and runs the
+benchmarks. It also runs dokimi-mutate-go on every module except the examples.
+[CONTRIBUTING.md](CONTRIBUTING.md) lists the tools that the gate needs and describes how to propose
+a change.
+
+[docs/](docs/README.md) contains the RFCs, the ADRs and the research of go-cli.
 
 ## Security
 
