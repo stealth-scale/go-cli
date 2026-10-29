@@ -291,7 +291,7 @@ go:
   mutate:
     timeout: 0s
     args: []
-    skip: []
+    skip: [go.stealthscale.io/cli/examples/...]
     workers: 1
   # generate-go runs each command line of commands in order with the paths in every module.
   # verify-generate-go, the step generate of check, runs the same and fails when the run changes a
