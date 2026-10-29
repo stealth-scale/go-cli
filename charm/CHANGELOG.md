@@ -1,5 +1,12 @@
 # go.stealthscale.io/cli/charm
 
+## 0.2.4
+
+### Patch Changes
+
+- Updated dependencies [5908f7c]
+  - go.stealthscale.io/cli@0.8.0
+
 ## 0.2.3
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # go.stealthscale.io/cli
 
+## 0.8.0
+
+### Minor Changes
+
+- 5908f7c: Add `App.EnvPrefix` to start the environment variables of an app with a prefix other than its name.
+
 ## 0.7.0
 
 ### Minor Changes
