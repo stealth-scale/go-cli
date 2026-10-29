@@ -16,9 +16,10 @@ const (
 	debugHelp = "Print the value and the source of each option before the command runs."
 )
 
-// debugOption returns the option --flag-debug of the app of the root scope s: a bool with the
-// environment variable <APP>_FLAG_DEBUG and no config key. It converts its value by its kind, so
-// a conversion of bool that Convert registers does not apply to it.
+// debugOption returns the option --flag-debug of the app of the root scope s. The option is a bool
+// without a config key. Its environment variable is FLAG_DEBUG after the prefix of s, such as
+// SRV_FLAG_DEBUG. It converts its value by its kind, so a conversion of bool that Convert registers
+// does not apply to it.
 func debugOption(s *scope) *option {
 	t := reflect.TypeFor[bool]()
 	o := &option{value: reflect.New(t).Elem(), conv: kindConverter(t), help: debugHelp}

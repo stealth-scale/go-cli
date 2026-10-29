@@ -133,7 +133,7 @@ func (a *App[G]) declare() (*declaration[G], error) {
 		return nil, fmt.Errorf("%w: the command name %s is reserved", ErrDeclaration, completionName)
 	}
 	d := &declaration[G]{global: new(G), dicts: map[string]bool{}}
-	root := &scope{app: a.name, path: reflect.TypeFor[G]().String()}
+	root := &scope{envPrefix: a.envPrefix, path: reflect.TypeFor[G]().String()}
 	globals, err := a.options(nil, reflect.ValueOf(d.global).Elem(), root)
 	if err != nil {
 		return nil, err
@@ -192,7 +192,7 @@ func (a *App[G]) bindAll(parent *binding[G], cmds []*command[G], all []*option) 
 		if slices.ContainsFunc(parent.children, func(b *binding[G]) bool { return b.name == c.name }) {
 			return nil, fmt.Errorf("%w: two commands have the name %s", ErrDeclaration, c.path)
 		}
-		b, err := c.bind(&scope{app: a.name, command: strings.Fields(c.path), ancestors: ancestors})
+		b, err := c.bind(&scope{envPrefix: a.envPrefix, command: strings.Fields(c.path), ancestors: ancestors})
 		if err != nil {
 			return nil, err
 		}

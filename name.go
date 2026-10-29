@@ -27,10 +27,14 @@ const (
 // letters and digits that single dashes join, the first word starting with a letter.
 var namePattern = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
 
+// envPattern matches the prefix of [App.EnvPrefix]: words of upper-case ASCII letters and digits that
+// single underscores join, the first word starting with a letter.
+var envPattern = regexp.MustCompile(`^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$`)
+
 // scope is the position of an options struct in the names of its options and in the tree of the
 // commands of the app.
 type scope struct {
-	app       string          // the name of the app
+	envPrefix string          // the start of each environment variable, such as SRV, or empty for none
 	path      string          // the Go path of the struct in messages, such as main.Serve.Cache
 	command   []string        // the names of the path of the command, or nil for the options of the app
 	groups    []string        // the names of the groups that contain the struct, the outermost first
@@ -72,16 +76,18 @@ func (s *scope) nest(f *reflect.StructField) (scope, error) {
 }
 
 // names returns the flag, the environment variable and the config key of the option name in s. The
-// flag joins the groups and the name with dashes. The environment variable joins the app, the path
-// of the command, the groups and the name in upper case with underscores. The config key joins the
-// path of the command, the groups and the name with dots.
+// flag joins the groups and the name with dashes. The environment variable starts with the prefix of
+// s and joins the path of the command, the groups and the name in upper case with underscores. The
+// config key joins the path of the command, the groups and the name with dots.
 func (s *scope) names(name string) (flag, env, key string) {
 	words := append(slices.Clone(s.groups), name)
 	flag = strings.Join(words, wordSeparator)
 	words = slices.Concat(s.command, words)
 	key = strings.Join(words, keySeparator)
-	env = strings.Join(slices.Insert(words, 0, s.app), envSeparator)
-	env = strings.ToUpper(strings.ReplaceAll(env, wordSeparator, envSeparator))
+	env = strings.ToUpper(strings.ReplaceAll(strings.Join(words, envSeparator), wordSeparator, envSeparator))
+	if s.envPrefix != "" {
+		env = s.envPrefix + envSeparator + env
+	}
 	return flag, env, key
 }
 
@@ -121,4 +127,22 @@ func kebab(field string) string {
 		b.WriteRune(unicode.ToLower(r))
 	}
 	return b.String()
+}
+
+// EnvPrefix registers prefix as the start of every environment variable of the app, in place of the
+// name of the app in upper case. With the prefix STORE, the option Addr of the command serve has the
+// variable STORE_SERVE_ADDR, and the global flag --flag-debug has STORE_FLAG_DEBUG. The empty prefix
+// leaves the start out, so the same option has SERVE_ADDR and a global option Config has CONFIG. The
+// tag env of an option replaces its whole variable, so the prefix does not apply to it. A later call
+// replaces an earlier one.
+//
+// [App.Execute] returns an error that wraps [ErrDeclaration] for a prefix that is not a name of
+// upper-case words: words of upper-case ASCII letters and digits that single underscores join, the
+// first word starting with a letter.
+func (a *App[G]) EnvPrefix(prefix string) {
+	if prefix != "" && !envPattern.MatchString(prefix) {
+		a.errs = append(a.errs, fmt.Errorf("%w: the environment prefix %q is not a name of upper-case words",
+			ErrDeclaration, prefix))
+	}
+	a.envPrefix = prefix
 }

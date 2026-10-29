@@ -35,6 +35,9 @@ type (
 		HTTP2Port int
 		DryRun    bool
 	}
+	tokenOptions struct {
+		Token string `env:"API_TOKEN"`
+	}
 )
 
 // TestName checks the flag, the environment variable and the config key that Execute derives for
@@ -235,6 +238,148 @@ func TestName(t *testing.T) {
 			res := execute(t, app, []string{command}, map[string]string{"MY_APP_SERVE_PORT": "8"}, nil)
 			assert.NoError(t, res.err, "Execute runs the command")
 			assert.Equal(t, got, 8, "the run reads MY_APP_SERVE_PORT")
+		})
+	})
+
+	t.Run("EnvPrefix", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name       string
+			givePrefix string
+			giveVars   map[string]string
+			giveField  func(run *cli.Run[nameGlobal, nameOptions]) any
+			want       cli.Source
+		}{
+			{
+				name:       "replaces the app name in the variable of an option of a command",
+				givePrefix: "STORE",
+				giveVars:   map[string]string{"STORE_SERVE_DRY_RUN": "true"},
+				giveField:  func(run *cli.Run[nameGlobal, nameOptions]) any { return &run.Config().DryRun },
+				want:       cli.Source{Kind: cli.Environment, Name: "STORE_SERVE_DRY_RUN"},
+			},
+			{
+				name:       "replaces the app name in the variable of a global option",
+				givePrefix: "STORE",
+				giveVars:   map[string]string{"STORE_VERBOSE": "true"},
+				giveField:  func(run *cli.Run[nameGlobal, nameOptions]) any { return &run.Global().Verbose },
+				want:       cli.Source{Kind: cli.Environment, Name: "STORE_VERBOSE"},
+			},
+			{
+				name:       "takes a prefix of words with digits that underscores join",
+				givePrefix: "MY_STORE2",
+				giveVars:   map[string]string{"MY_STORE2_SERVE_DRY_RUN": "true"},
+				giveField:  func(run *cli.Run[nameGlobal, nameOptions]) any { return &run.Config().DryRun },
+				want:       cli.Source{Kind: cli.Environment, Name: "MY_STORE2_SERVE_DRY_RUN"},
+			},
+			{
+				name:       "starts the variable of an option of a command with the command for an empty prefix",
+				givePrefix: "",
+				giveVars:   map[string]string{"SERVE_DRY_RUN": "true"},
+				giveField:  func(run *cli.Run[nameGlobal, nameOptions]) any { return &run.Config().DryRun },
+				want:       cli.Source{Kind: cli.Environment, Name: "SERVE_DRY_RUN"},
+			},
+			{
+				name:       "starts the variable of a global option with its name for an empty prefix",
+				givePrefix: "",
+				giveVars:   map[string]string{"VERBOSE": "true"},
+				giveField:  func(run *cli.Run[nameGlobal, nameOptions]) any { return &run.Global().Verbose },
+				want:       cli.Source{Kind: cli.Environment, Name: "VERBOSE"},
+			},
+			{
+				name:       "does not read the variable that starts with the app name",
+				givePrefix: "STORE",
+				giveVars:   map[string]string{"SRV_SERVE_DRY_RUN": "true"},
+				giveField:  func(run *cli.Run[nameGlobal, nameOptions]) any { return &run.Config().DryRun },
+				want:       cli.Source{},
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+				app, got := serving[nameGlobal, nameOptions](t)
+				app.EnvPrefix(tt.givePrefix)
+				res := execute(t, app, []string{command}, tt.giveVars, nil)
+				assert.NoError(t, res.err, "Execute runs the command")
+				src, ok := got.Source(tt.giveField(got))
+				assert.True(t, ok, "the run has the source of the option")
+				assert.Equal(t, src, tt.want, "the source states the variable of the prefix")
+			})
+		}
+
+		t.Run("keeps the variable of the tag env", func(t *testing.T) {
+			t.Parallel()
+			app, got := serving[struct{}, tokenOptions](t)
+			app.EnvPrefix("STORE")
+			res := execute(t, app, []string{command}, map[string]string{"API_TOKEN": "x"}, nil)
+			assert.NoError(t, res.err, "Execute runs the command")
+			src, ok := got.Source(&got.Config().Token)
+			assert.True(t, ok, "the run has the source of the option")
+			assert.Equal(t, src, cli.Source{Kind: cli.Environment, Name: "API_TOKEN"},
+				"the source states the variable of the tag")
+		})
+
+		t.Run("replaces the app name in the variable of --flag-debug", func(t *testing.T) {
+			t.Parallel()
+			app, _ := serving[nameGlobal, nameOptions](t)
+			app.EnvPrefix("STORE")
+			res := execute(t, app, []string{command}, map[string]string{"STORE_FLAG_DEBUG": "true"}, nil)
+			assert.NoError(t, res.err, "Execute runs the command")
+			assert.NotEmpty(t, res.stderr, "Stderr receives the table of --flag-debug")
+		})
+
+		t.Run("shows the variable of the prefix in the help", func(t *testing.T) {
+			t.Parallel()
+			app, _ := serving[nameGlobal, nameOptions](t)
+			app.EnvPrefix("STORE")
+			res := execute(t, app, []string{command, "--help"}, nil, nil)
+			assert.NoError(t, res.err, "Execute writes the help")
+			assert.Contains(t, res.stdout, "env STORE_SERVE_DRY_RUN", "the help states the variable of the prefix")
+		})
+
+		t.Run("uses the prefix of the last call", func(t *testing.T) {
+			t.Parallel()
+			app, got := serving[nameGlobal, nameOptions](t)
+			app.EnvPrefix("OLD")
+			app.EnvPrefix("STORE")
+			vars := map[string]string{"OLD_SERVE_DRY_RUN": "true", "STORE_SERVE_DRY_RUN": "true"}
+			res := execute(t, app, []string{command}, vars, nil)
+			assert.NoError(t, res.err, "Execute runs the command")
+			src, ok := got.Source(&got.Config().DryRun)
+			assert.True(t, ok, "the run has the source of the option")
+			assert.Equal(t, src, cli.Source{Kind: cli.Environment, Name: "STORE_SERVE_DRY_RUN"},
+				"the source states the variable of the last prefix")
+		})
+
+		invalid := []struct {
+			name       string
+			givePrefix string
+		}{
+			{name: "returns ErrDeclaration for a prefix in lower case", givePrefix: "store"},
+			{name: "returns ErrDeclaration for a prefix that starts with a digit", givePrefix: "2STORE"},
+			{name: "returns ErrDeclaration for a prefix that ends with an underscore", givePrefix: "STORE_"},
+			{name: "returns ErrDeclaration for a prefix with two underscores in a row", givePrefix: "MY__STORE"},
+			{name: "returns ErrDeclaration for a prefix with a dash", givePrefix: "MY-STORE"},
+		}
+		for _, tt := range invalid {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+				app, _ := serving[nameGlobal, nameOptions](t)
+				app.EnvPrefix(tt.givePrefix)
+				res := execute(t, app, []string{command}, nil, nil)
+				assert.ErrorIs(t, res.err, cli.ErrDeclaration, "Execute returns ErrDeclaration")
+			})
+		}
+
+		t.Run("states the prefix in the error of an invalid prefix", func(t *testing.T) {
+			t.Parallel()
+			app, _ := serving[nameGlobal, nameOptions](t)
+			app.EnvPrefix("store")
+			res := execute(t, app, []string{command}, nil, nil)
+			assert.ErrorIs(t, res.err, cli.ErrDeclaration, "Execute returns ErrDeclaration")
+			assert.Equal(t, res.err.Error(),
+				`cli: invalid declaration: the environment prefix "store" is not a name of upper-case words`,
+				"the error states the prefix")
 		})
 	})
 }

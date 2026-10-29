@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strings"
 )
 
 // The exit statuses that [App.Main] returns.
@@ -32,7 +33,7 @@ const (
 // # Concurrency
 //
 // Execute and Main are safe for concurrent use once the last registration has returned. The
-// registrations are the calls of Command, Complete, Convert, Format, Handle, IgnoreKeys,
+// registrations are the calls of Command, Complete, Convert, EnvPrefix, Format, Handle, IgnoreKeys,
 // LocateConfig, Render, RenderFor, Use and Version of the app, and of Command and Use of its
 // commands. They are not safe for concurrent use.
 type App[G any] struct {
@@ -45,6 +46,7 @@ type App[G any] struct {
 	locate     func(global *G, env *Env) (string, error)       // the function of LocateConfig, or nil
 	name       string
 	help       string
+	envPrefix  string        // the prefix of EnvPrefix, or the name in upper case without a call
 	version    string        // the text of Version, or empty for an app without a version
 	commands   []*command[G] // the commands in the order of their registration
 	hooks      []Hook[G, G]  // the hooks of the app in the order of their registration
@@ -52,10 +54,12 @@ type App[G any] struct {
 	errs       []error       // the invalid registrations, which Execute returns
 }
 
-// New returns an app named name, with the help text help. The name starts every environment
-// variable of the app and every message that [App.Main] writes. The app reads config files with the
-// extension .json as [JSON] and .ini as [INI], and converts url.URL, time.Location, net.IPNet and
-// fs.FileMode, which have no text method of their own. It writes its output with [Plain].
+// New returns an app named name, with the help text help. The name starts every message that
+// [App.Main] writes. In upper case, with an underscore for each dash, it also starts every
+// environment variable of the app, and [App.EnvPrefix] replaces it there. The app reads config files
+// with the extension .json as [JSON] and .ini as [INI], and converts url.URL, time.Location,
+// net.IPNet and fs.FileMode, which have no text method of their own. It writes its output with
+// [Plain].
 func New[G any](name, help string) *App[G] {
 	return &App[G]{
 		renderer:   Plain{},
@@ -64,6 +68,7 @@ func New[G any](name, help string) *App[G] {
 		formats:    map[string]Format{jsonExt: JSON, iniExt: INI},
 		name:       name,
 		help:       help,
+		envPrefix:  strings.ToUpper(strings.ReplaceAll(name, wordSeparator, envSeparator)),
 	}
 }
 

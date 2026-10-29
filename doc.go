@@ -47,7 +47,9 @@
 //   - The config key joins the path of the command and the flag with dots, such as serve.addr and
 //     db.migrate.steps.
 //
-// A global option has no command in its variable and its key.
+// A global option has no command in its variable and its key. [App.EnvPrefix] replaces the app at
+// the start of every variable, such as STORE in STORE_SERVE_ADDR. The empty prefix leaves the start
+// out.
 //
 // A struct field without a conversion is a group. The name of a named field starts the names of
 // its options: the field TLS with the field Cert gives the flag --tls-cert, the variable
