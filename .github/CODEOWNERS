@@ -2,5 +2,5 @@
 # review a change to the paths that it matches. The last matching line applies.
 #
 # https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
-#
-# *       @stealth-scale/go-cli-maintainers
+
+* @stealth-rklopper
