@@ -131,7 +131,7 @@ name of the field:
 | Name | Rule | `Timeout` in `srv serve` |
 |---|---|---|
 | Flag | The name of the field in kebab case | `--timeout` |
-| Environment variable | The app, the path of the command and the flag in upper case with an underscore for each dash | `SRV_SERVE_TIMEOUT` |
+| Environment variable | The prefix of the app, the path of the command and the flag in upper case with an underscore for each dash | `SRV_SERVE_TIMEOUT` |
 | Config key | The path of the command and the flag joined with dots | `serve.timeout` |
 
 Kebab case splits the name of a field into words, so `DryRun` becomes `--dry-run` and `HTTPPort`
@@ -140,8 +140,21 @@ option `Config` has the variable `SRV_CONFIG`. The path of a subcommand contains
 command and of itself, so the option `Steps` of `srv db migrate` has the variable
 `SRV_DB_MIGRATE_STEPS` and the key `db.migrate.steps`.
 
+The prefix of the app is the name that `cli.New` receives, in upper case with an underscore for
+each dash. `App.EnvPrefix` replaces the prefix for every variable of the app, and the empty prefix
+leaves it out:
+
+```go
+a := cli.New[Global]("srv", "Serve the store.")
+a.EnvPrefix("STORE") // STORE_SERVE_TIMEOUT, STORE_CONFIG and STORE_FLAG_DEBUG
+```
+
+The tag `env` replaces the whole variable of one option, so the prefix does not apply to it. The
+example [`18-environment`](examples/18-environment) shows both in the program `storectl`.
+
 The name of an app, a command, a group or an option has words of lower-case ASCII letters and
-digits. Single dashes join the words. The first word starts with a letter.
+digits. Single dashes join the words. The first word starts with a letter. A prefix of
+`App.EnvPrefix` has words of upper-case ASCII letters and digits, and single underscores join them.
 
 ## Tags
 
@@ -951,7 +964,7 @@ minor release can contain a breaking change, and the changelog marks each breaki
 
 ## Examples
 
-[`examples/`](examples) contains 17 runnable programs. The test of each example compares its output
+[`examples/`](examples) contains 18 runnable programs. The test of each example compares its output
 with a golden transcript. [examples/README.md](examples/README.md) lists what each example shows.
 
 ## Development
