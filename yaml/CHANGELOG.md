@@ -1,5 +1,14 @@
 # go.stealthscale.io/cli/yaml
 
+## 0.1.9
+
+### Patch Changes
+
+- 2d9b942: Update `go.dokimi.dev/assert` to v0.16.0.
+- 2d9b942: Update `go.yaml.in/yaml/v3` to v3.0.6.
+- Updated dependencies [2d9b942]
+  - go.stealthscale.io/cli@0.8.1
+
 ## 0.1.8
 
 ### Patch Changes

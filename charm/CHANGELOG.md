@@ -1,5 +1,14 @@
 # go.stealthscale.io/cli/charm
 
+## 0.2.5
+
+### Patch Changes
+
+- 2d9b942: Update `go.dokimi.dev/assert` to v0.16.0.
+- 2d9b942: Update every indirect dependency to its latest version.
+- Updated dependencies [2d9b942]
+  - go.stealthscale.io/cli@0.8.1
+
 ## 0.2.4
 
 ### Patch Changes
