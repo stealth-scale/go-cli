@@ -1,5 +1,11 @@
 # go.stealthscale.io/cli
 
+## 0.8.1
+
+### Patch Changes
+
+- 2d9b942: Update `go.dokimi.dev/assert` to v0.16.0.
+
 ## 0.8.0
 
 ### Minor Changes
