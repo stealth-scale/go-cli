@@ -7,7 +7,7 @@ go 1.27.2
 
 require (
 	github.com/BurntSushi/toml v1.6.0
-	go.dokimi.dev/assert v0.16.0
+	go.dokimi.dev/assert v0.18.0
 	go.stealthscale.io/cli v0.8.1
 )
 
