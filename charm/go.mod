@@ -6,9 +6,9 @@ module go.stealthscale.io/cli/charm
 go 1.27.2
 
 require (
-	charm.land/lipgloss/v2 v2.0.6
+	charm.land/lipgloss/v2 v2.1.0
 	github.com/charmbracelet/colorprofile v0.4.3
-	go.dokimi.dev/assert v0.16.0
+	go.dokimi.dev/assert v0.22.0
 	go.stealthscale.io/cli v0.8.1
 )
 
